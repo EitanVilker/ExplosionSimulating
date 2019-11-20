@@ -126,16 +126,11 @@ public:
 ////////// Helper functions
 protected:
 	//get front of curve point
-  real get_distance_traveled(real t, const real dt, real temperature){
+	VectorD get_distance_traveled_chord(const real t, const real dt, const real temperature){
 		// call velocity from 0 to t by dt
 	}
 
-	real scale_by_distance(real value, real dist_trav, real total_length){
-
-	}
-
-
-	real grid_absolute_distance(){
+	inline real scale_by_distance(const real value, const real dist_trav, const real total_length){
 
 	}
 
@@ -292,5 +287,4 @@ protected:
 	{
 		return Bnd(Coord(node_index));
 	}
-};
 };
