@@ -3,13 +3,17 @@
 #include "Common.h"
 #include "Grid.h"
 
+#include <fstream>
+#include <sys/types.h>
+#include <dirent.h>
+
 //////////////////////////////////////////////////////////////////////////
 ////Particle fluid simulator
 template<int d> class ExplosionSim
 {
 	using VectorD = Vector<real, d>; using VectorDi = Vector<int, d>;
 public:
-	////////// Data Structure Variables
+	////// Data Structure Variables
 	Grid<d> grid;
 	Array<VectorD> velocities;							//Velocity    on grid cells
 	Array<real>    densities;							//Density     on grid cells
@@ -18,7 +22,12 @@ public:
 	Array<real>    div_vels;							//Divergence  on grid cells
 	Array<real>	   vorticities;							//Vortices    on grid cells
 
-	////////// Other Constants and Variables
+
+	//Hardcoded test variable
+	string directory_path;
+	Array<Array<real>> controlPaths;
+
+	////// Other Constants and Variables
 
 	// Grid and Control Paths
 	int node_num;
@@ -35,6 +44,7 @@ public:
 	real t_n = 3 * t_d;					//Time to reach p_0 from t_d (AC)
 	real b = 4;							//Decreasing coefficient (AC)
 	real density_0 = 1.1839;			//Ambient density at STP (AC)
+	const p_scale = 0.5;        // scale the pressure by pressure velocity with this constant (randomly picked)
 
 	//time
 	real time;							//Current time passed (seconds)
@@ -99,29 +109,74 @@ public:
 		//TODO: get the sweep region around pos and put into cells
 	}
 
+	virtual void PreProcessing(string dir_name){
+		// 	Intialize Variables
+		Array<String> file_names;
 
-////////// Helper functions
+		// open through directory, find array of text files
+		read_directory(dir_name, file_names)
+
+
+		//for every textfile, call read_from_file, add to array
+
+
+	}
+
+
+////// Helper functions
 protected:
 	//get front of curve point
   real get_distance_traveled(real t, const real dt, real temperature){
 		// call velocity from 0 to t by dt
 	}
 
+	// scale value by length of control path
 	real scale_by_distance(real value, real dist_trav, real total_length){
 
 	}
 
-
-	real grid_absolute_distance(){
+	//find the distance of a point from another grid point
+	real grid_absolute_distance(VectorD point, VectorD center, real dx){
 
 	}
 
+	//find the length of a control path
 	real find_path_length(Array<VectorD>){
 
 	}
 
-	void read_from_file(){
+	void read_directory(const string& name, Array<string> v)
+	{
+			DIR* dirp = opendir(name.c_str());
+			struct dirent * dp;
+			while ((dp = readdir(dirp)) != NULL) {
+					v.push_back(dp->d_name);
+			}
+			closedir(dirp);
+	}
+
+	//read points from file and create control paths
+	Array<real> read_from_file(string file_path){ //what params?
+		ifstream inFile;
+
+		//read from file given file path
+		inFile.open(file_path);
+		string data;
+		string stream_input;
+		//read from file, get array of points
+		if (!inFile) {
+			 cout << "Unable to open file";
+			 exit(1); // terminate with error
+	 	}
+		while(inFile >> stream_input){
+				data = data + stream_input;
+		}
 		
+
+
+		// turn array of points into grid points
+
+		//return array
 	}
 
 	// Returns pressure based on current time
