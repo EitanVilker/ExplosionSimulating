@@ -2,6 +2,8 @@
 
 #include "Common.h"
 #include "Grid.h"
+#include "DCPQuery.h"
+#include "Particles.h"
 
 //////////////////////////////////////////////////////////////////////////
 ////Particle fluid simulator
@@ -29,6 +31,7 @@ public:
 	const real gamma = 1.4;				//Ratio of specific heats at ambient pressure (no units)
 	const real temp_amb = 25;			//Ambient temperature- Celcius
 	const real p_0 = 1;					//Ambient pressure at sea level- atm
+	real explosionTemp = 1000000;		//Temperature at start of explosion
 	real P_p = 30;						//Peak overpressure- atm (AC- arbitarily chosen)
 	real P_m = -10;						//Minimum negative pressure (AC)
 	real t_d = 7 / 100000;				//Time to reach p_0 (AC)
@@ -96,28 +99,36 @@ public:
 		Projection();
 	}
 
-	virtual void SweepRegion(const VectorD& pos, Array<int>& cells)
-	{
-		//TODO: get the sweep region around pos and put into cells
+	virtual void SweepRegion(const VectorD& pos, Array<int>& cells){
+
+		// pos is center of circle
+		// w is radius of circle
+		// TODO: change distance from sphere to circle
+		
 		for (int i = 0; i < cells.Size(); i++) {
 
 			real distance = 0;
 			Vector3i currentCellCoordinates = Coord(i);
 			for (int j = 0; j < d; j++) {
 
-				// Needs getPosition function
 				distance += sqrt(pos[j] * pos[j] - currentCellCoordinates[j] * currentCellCoordinates[j]);
 			}
 
 			if (distance < w) {
 
 				// Allocate uniform density value to each grid square here based on densityOpacityCurve
+				densities[i] = densityOpacityCurve(time);
 
 				// Allocate user-specified uniform temperature value, based upon how much time has passed, to each grid square 
+				temps[i] = getCurrentExplosionTemp();
 
 				// Allocate direction velocity to each grid square according to u_d(G(g)) = V(t_i)t(g), where g is a grid square, 
 				// G(g) is the set of grid square in the region, and t(g) is the unit tangent vector derived from g on the flow control path
 				// V(t_i) is the same for each grid square in the region
+				
+				// TODO: calculate the following variable
+				Vector3i unitVectorTangentToControlPath;
+				velocities[i] = densityPropagationCurve(time, temps[i]) * unitVectorTangentToControlPath;
 			}
 		}
 	}
@@ -179,12 +190,6 @@ protected:
 		return c * sqrt(1 + ((gamma + 1) * (pressureMagnitudeCurve(t) / (2 * gamma * p_0)));
 	}
 
-	// Returns speed of sound for a given temperature in m/s
-	real getSpeedOfSoundInAir(real temperature) {
-
-		return 331.5 + 0.6 * temperature;
-	}
-
 	// returns velocity magnitude v(t)
 	real densityPropagationCurve(real t, real temperature) {
 
@@ -196,6 +201,16 @@ protected:
 		output /= p_0;
 
 		return output;
+	}
+
+	// Returns speed of sound for a given temperature in m/s
+	real getSpeedOfSoundInAir(real temperature) {
+		return 331.5 + 0.6 * temperature;
+	}
+
+	// Returns uniform temperature value based on time elapsed
+	real getCurrentExplosionTemp() {
+		return explosionTemp - 100000 * time;
 	}
 
 	VectorD Interpolate(const Array<VectorD>& u, VectorD& pos)
@@ -274,7 +289,6 @@ protected:
 
 	////check if a node is on the boundary of the grid 
 	////given its coordinate or index
-	// Need to make 3D
 	bool Bnd(const Vector3i& node_coord) const
 	{
 		for (int i = 0; i < d; i++) {
