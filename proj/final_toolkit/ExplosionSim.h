@@ -20,9 +20,9 @@ public:
 	// Constants
 	int node_num;
 	int n_per_dim = 32;
-	const real d_amb = 1.4;					//Ratio of specific heats at ambient pressure (no units)
-	const real temp_amb = 25;					//Celcius
-	const real p_0 = 1;						//Ambient pressure- atm
+	const real d_amb = 1.4;				//Ratio of specific heats at ambient pressure (no units)
+	const real temp_amb = 25;			//Ambient temperature- Celcius
+	const real p_0 = 1;					//Ambient pressure- atm
 	real P_p = 1;						//Peak overpressure- need to determine appropriate value (NTD)
 	real P_m = -1;						//Minimum negative pressure (NTD)
 	real t_d = 3;						//Time to reach p_0 (NTD)
