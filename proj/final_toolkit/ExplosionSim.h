@@ -9,6 +9,7 @@ template<int d> class ExplosionSim
 {
 	using VectorD = Vector<real, d>; using VectorDi = Vector<int, d>;
 public:
+	////////// Data Structure Variables
 	Grid<d> grid;
 	Array<VectorD> velocities;							//Velocity    on grid cells
 	Array<real>    densities;							//Density     on grid cells
@@ -17,9 +18,14 @@ public:
 	Array<real>    div_vels;							//Divergence  on grid cells
 	Array<real>	   vorticities;							//Vortices    on grid cells
 
-	// Constants
+	////////// Other Constants and Variables
+
+	// Grid and Control Paths
 	int node_num;
 	int n_per_dim = 32;
+	real width = 5;              // This is completely arbitrary.
+
+	// Physics
 	const real gamma = 1.4;				//Ratio of specific heats at ambient pressure (no units)
 	const real temp_amb = 25;			//Ambient temperature- Celcius
 	const real p_0 = 1;					//Ambient pressure at sea level- atm
@@ -30,8 +36,11 @@ public:
 	real b = 4;							//Decreasing coefficient (AC)
 	real density_0 = 1.1839;			//Ambient density at STP (AC)
 
+	//time
 	real time;							//Current time passed (seconds)
 	real dt = 0.01;						//Timestep (seconds)
+
+	// Simulation
 	bool explosion_done;				//Determines whether or not we are only doing process 5
 
 	virtual void Initialize()
@@ -85,13 +94,35 @@ public:
 		Projection();
 	}
 
-	virtual void SweepRegion(const VectorD& pos, Array<int>& cells) 
+	virtual void SweepRegion(const VectorD& pos, Array<int>& cells)
 	{
 		//TODO: get the sweep region around pos and put into cells
 	}
 
-	////Helper functions
+
+////////// Helper functions
 protected:
+	//get front of curve point
+  real get_distance_traveled(real t, const real dt, real temperature){
+		// call velocity from 0 to t by dt
+	}
+
+	real scale_by_distance(real value, real dist_trav, real total_length){
+
+	}
+
+
+	real grid_absolute_distance(){
+
+	}
+
+	real find_path_length(Array<VectorD>){
+
+	}
+
+	void read_from_file(){
+		
+	}
 
 	// Returns pressure based on current time
 	real pressureMagnitudeCurve(real t) {
