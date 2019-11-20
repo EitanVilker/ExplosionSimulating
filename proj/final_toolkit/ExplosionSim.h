@@ -32,7 +32,7 @@ public:
 	// Grid and Control Paths
 	int node_num;
 	int n_per_dim = 32;
-	real width = 5;              // This is completely arbitrary.
+	real w = 3;							//Width of sweeping region- m (AC)
 
 	// Physics
 	const real gamma = 1.4;				//Ratio of specific heats at ambient pressure (no units)
@@ -49,6 +49,7 @@ public:
 	//time
 	real time;							//Current time passed (seconds)
 	real dt = 0.01;						//Timestep (seconds)
+	const int d = 3;					//Number of dimensions
 
 	// Simulation
 	bool explosion_done;				//Determines whether or not we are only doing process 5
@@ -107,6 +108,27 @@ public:
 	virtual void SweepRegion(const VectorD& pos, Array<int>& cells)
 	{
 		//TODO: get the sweep region around pos and put into cells
+		for (int i = 0; i < cells.Size(); i++) {
+
+			real distance = 0;
+			Vector3i currentCellCoordinates = Coord(i);
+			for (int j = 0; j < d; j++) {
+
+				// Needs getPosition function
+				distance += sqrt(pos[j] * pos[j] - currentCellCoordinates[j] * currentCellCoordinates[j]);
+			}
+
+			if (distance < w) {
+
+				// Allocate uniform density value to each grid square here based on densityOpacityCurve
+
+				// Allocate user-specified uniform temperature value, based upon how much time has passed, to each grid square
+
+				// Allocate direction velocity to each grid square according to u_d(G(g)) = V(t_i)t(g), where g is a grid square,
+				// G(g) is the set of grid square in the region, and t(g) is the unit tangent vector derived from g on the flow control path
+				// V(t_i) is the same for each grid square in the region
+			}
+		}
 	}
 
 	virtual void PreProcessing(string dir_name){
@@ -171,7 +193,7 @@ protected:
 		while(inFile >> stream_input){
 				data = data + stream_input;
 		}
-		
+
 
 
 		// turn array of points into grid points
@@ -263,4 +285,48 @@ protected:
 		return Vector3::Zero();
 		////your implementation here
 	}
+
+	/*
+	/////
+	/////
+	Grid helper functions: REVIEW NECESSARY
+	/////
+	/////
+	/////
+	/////
+	*/
+	////return the node index given its coordinate
+	int Idx(const Vector3i& node_coord) const
+	{
+		return grid.Node_Index(node_coord);
+	}
+
+	////return the coordinate given its index
+	VectorDi Coord(const int node_index) const
+	{
+		return grid.Node_Coord(node_index);
+	}
+
+	////return the node position given its index
+	VectorD Pos(const int node_index) const
+	{
+		return grid.Node(node_index);
+	}
+
+	////check if a node is on the boundary of the grid
+	////given its coordinate or index
+	// Need to make 3D
+	bool Bnd(const Vector3i& node_coord) const
+	{
+		for (int i = 0; i < d; i++) {
+			if (node_coord[i] == 0 || node_coord[i] == grid.node_counts[i] - 1)
+				return true;
+		}
+		return false;
+	}
+	bool Bnd(const int node_index) const
+	{
+		return Bnd(Coord(node_index));
+	}
+};
 };
