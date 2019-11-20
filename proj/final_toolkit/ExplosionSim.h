@@ -17,11 +17,18 @@ public:
 	Array<real>    div_vels;							//Divergence  on grid cells
 	Array<real>	   vorticities;							//Vortices    on grid cells
 
+	// Constants
 	int node_num;
 	int n_per_dim = 32;
-	real d_amb = 1.4;					//Ratio of specific heats (no units)
-	real temp_amb = 25;					//Celcius
-	real pres_atm = 1;					//ATM
+	const real d_amb = 1.4;					//Ratio of specific heats at ambient pressure (no units)
+	const real temp_amb = 25;					//Celcius
+	const real p_0 = 1;						//Ambient pressure- atm
+	real P_p = 1;						//Peak overpressure- need to determine appropriate value (NTD)
+	real P_m = -1;						//Minimum negative pressure (NTD)
+	real t_d = 3;						//Time to reach p_0 (NTD)
+	real t_n = 3;						//Time to reach p_0 from t_d (NTD)
+	real b;								//Decreasing coefficient (NTD)
+	real density_0;						//Ambient density (NTD)- paper mentions that this is specifically set by the user
 
 	real time;							//current time
 	bool explosion_done;				
@@ -84,6 +91,63 @@ public:
 
 	////Helper functions
 protected:
+
+	// This curve takes as input various predetermined times and coefficients (seems somewhat arbitrary)
+	// Everything but t should be a predetermined value that is global to ExplosionSim
+	// Returns pressure based on current time
+	virtual real pressureMagnitudeCurve(real t) {
+
+		real output = p_0;
+		if (t <= t_d) {
+			output += P_p * (1 - t / t_d) * exp((-bt) / t_d);
+		}
+		else if (t <= t_d + t_n / 2) {
+			output -= (2 * (P_m / t_n) * (t - t_d));
+		}
+		else if (t <= t_d + t_n) {
+			output -= 2 * (P_m / t_n) * (t_d + t_n - t);
+		}
+		else {
+			// do nothing, output should just be p_0
+		}
+
+		return output;
+	}
+
+	// Returns density based on current time
+	real densityOpacityCurve(real t, real gamma) {
+
+		real output = (gamma + 1) * pressureMagnitudeCurve(t) + 2 * gamma * p_0;
+		output /= ((gamma - 1) * pressureMagnitudeCurve(t) + 2 * gamma * p_0);
+		output *= density_0;
+
+		return output;
+	}
+
+	// Returns velocity magnitude v_p(t)
+	real pressurePropagationCurve(real t, real gamma, real temperature) {
+
+		real c = getSpeedOfSoundInAir(temperature);
+		return c * sqrt(1 + ((gamma + 1) * (pressureMagnitudeCurve(t) / (2 * gamma * p_0)));
+	}
+
+	// Returns speed of sound for a given temperature in m/s
+	real getSpeedOfSoundInAir(real temperature) {
+
+		return 331.5 + 0.6 * temperature;
+	}
+
+	// returns velocity magnitude v(t)
+	real densityPropagationCurve(real t, real c, real gamma) {
+
+		real output = 1 / sqrt(1 + (gamma + 1) * pressureMagnitudeCurve(t) / (2 * gamma * p_0));
+		output *= c;
+		output *= pressureMagnitudeCurve(t);
+		output /= gamma;
+		output /= p_0;
+
+		return output;
+	}
 
 	VectorD Interpolate(const Array<VectorD>& u, VectorD& pos)
 	{
