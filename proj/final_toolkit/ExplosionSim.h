@@ -2,6 +2,7 @@
 
 #include "Common.h"
 #include "Grid.h"
+#include "Particles.h"
 
 //////////////////////////////////////////////////////////////////////////
 ////Particle fluid simulator
@@ -31,7 +32,8 @@ public:
 	real density_0 = 1.1839;			//Ambient density at STP (AC)
 
 	real time;							//Current time passed (seconds)
-	real dt = 0.01;						//Timestep (seconds)
+	real dt = 0.01;						//Timestep- seconds (AC)
+	const int d = 3;					//Number of dimensions
 	bool explosion_done;				//Determines whether or not we are only doing process 5
 
 	virtual void Initialize()
@@ -50,8 +52,6 @@ public:
 		pressures.resize(node_num, pres_atm);
 		div_vels.resize(node_num, 0);
 		vorticities.resize(node_num, 0);
-
-		//TODO: Initiating particles
 	}
 
 	virtual void Advection(real dt)
@@ -71,7 +71,6 @@ public:
 		time += dt;
 		if (!explosion_done)
 		{
-			//TODO: Calculate Density Opacity
 			//TODO: Get nurbs curve value
 			//Get which cells need to be looked at rn - Sweep Region
 			//TODO: Density and Temperature in Sweep Region
@@ -88,6 +87,27 @@ public:
 	virtual void SweepRegion(const VectorD& pos, Array<int>& cells) 
 	{
 		//TODO: get the sweep region around pos and put into cells
+		for (int i = 0; i < cells.Size(); i++) {
+
+			real distance = 0;
+			Vector3i currentCellCoordinates = Coord(i);
+			for (int j = 0; j < d; j++) {
+
+				// Needs getPosition function
+				distance += sqrt(pos[j] * pos[j] - currentCellCoordinates[j] * currentCellCoordinates[j]);
+			}
+
+			if (distance < w) {
+
+				// Allocate uniform density value to each grid square here based on densityOpacityCurve
+
+				// Allocate user-specified uniform temperature value, based upon how much time has passed, to each grid square 
+
+				// Allocate direction velocity to each grid square according to u_d(G(g)) = V(t_i)t(g), where g is a grid square, 
+				// G(g) is the set of grid square in the region, and t(g) is the unit tangent vector derived from g on the flow control path
+				// V(t_i) is the same for each grid square in the region
+			}
+		}
 	}
 
 	////Helper functions
@@ -176,5 +196,48 @@ protected:
 	{
 		return Vector3::Zero();
 		////your implementation here
+	}
+
+	/*
+	/////
+	/////
+	Grid helper functions: REVIEW NECESSARY
+	/////
+	/////
+	/////
+	/////
+	*/
+	////return the node index given its coordinate
+	int Idx(const Vector3i& node_coord) const
+	{
+		return grid.Node_Index(node_coord);
+	}
+
+	////return the coordinate given its index
+	VectorDi Coord(const int node_index) const
+	{
+		return grid.Node_Coord(node_index);
+	}
+
+	////return the node position given its index
+	VectorD Pos(const int node_index) const
+	{
+		return grid.Node(node_index);
+	}
+
+	////check if a node is on the boundary of the grid 
+	////given its coordinate or index
+	// Need to make 3D
+	bool Bnd(const Vector3i& node_coord) const
+	{
+		for (int i = 0; i < d; i++) {
+			if (node_coord[i] == 0 || node_coord[i] == grid.node_counts[i] - 1)
+				return true;
+		}
+		return false;
+	}
+	bool Bnd(const int node_index) const
+	{
+		return Bnd(Coord(node_index));
 	}
 };
