@@ -23,7 +23,7 @@ public:
 	// Grid and Control Paths
 	int node_num;
 	int n_per_dim = 32;
-	real width = 5;              // This is completely arbitrary.
+	real w = 3;							//Width of sweeping region- m (AC)
 
 	// Physics
 	const real gamma = 1.4;				//Ratio of specific heats at ambient pressure (no units)
