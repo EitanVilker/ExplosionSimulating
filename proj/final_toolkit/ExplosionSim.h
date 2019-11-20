@@ -35,6 +35,7 @@ public:
 	real t_n = 3 * t_d;					//Time to reach p_0 from t_d (AC)
 	real b = 4;							//Decreasing coefficient (AC)
 	real density_0 = 1.1839;			//Ambient density at STP (AC)
+	real heatFlux = 286478.9;			//Heat flux (J/m^2)
 
 	//time
 	real time;							//Current time passed (seconds)
