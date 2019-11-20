@@ -228,9 +228,27 @@ protected:
 	////3D tri-linear interpolation
 	Vector3 Interpolate_Helper(const Vector3i& cell, const Vector3& frac, const Array<Vector3>& u)
 	{
-		return Vector3::Zero();
-		////your implementation here
+		return lerp(
+			lerp(
+				lerp(u[Idx(cell),
+					u[Idx(Vector3i(cell[0] + 1, cell[1], cell[2]))],
+					frac[0]),
+				lerp(u[Idx(Vector3i(cell[0], cell[1] + 1, cell[2]))],
+					u[Idx(Vector3i(cell[0] + 1, cell[1] + 1, cell[2]))],
+					frac[0]),
+				frac[1]),
+				lerp(u[Idx(Vector3i(cell[0], cell[1], cell[2] + 1),
+				u[Idx(Vector3i(cell[0] + 1, cell[1], cell[2] + 1))],
+				frac[0]),
+				lerp(u[Idx(Vector3i(cell[0], cell[1] + 1, cell[2] + 1))],
+					u[Idx(Vector3i(cell[0] + 1, cell[1] + 1, cell[2] + 1))],
+					frac[0]),
+				frac[1]),
+			frac[2]);
 	}
+
+	template <class T>
+	T lerp(T val1, T val2, real v) { return v * val2 + (1 - v) * val1; }
 
 	/*
 	/////
