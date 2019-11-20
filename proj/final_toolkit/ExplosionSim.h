@@ -20,18 +20,19 @@ public:
 	// Constants
 	int node_num;
 	int n_per_dim = 32;
-	const real d_amb = 1.4;				//Ratio of specific heats at ambient pressure (no units)
+	const real gamma = 1.4;				//Ratio of specific heats at ambient pressure (no units)
 	const real temp_amb = 25;			//Ambient temperature- Celcius
-	const real p_0 = 1;					//Ambient pressure- atm
-	real P_p = 1;						//Peak overpressure- need to determine appropriate value (NTD)
-	real P_m = -1;						//Minimum negative pressure (NTD)
-	real t_d = 3;						//Time to reach p_0 (NTD)
-	real t_n = 3;						//Time to reach p_0 from t_d (NTD)
-	real b;								//Decreasing coefficient (NTD)
-	real density_0;						//Ambient density (NTD)- paper mentions that this is specifically set by the user
+	const real p_0 = 1;					//Ambient pressure at sea level- atm
+	real P_p = 30;						//Peak overpressure- atm (AC- arbitarily chosen)
+	real P_m = -10;						//Minimum negative pressure (AC)
+	real t_d = 7 / 100000;				//Time to reach p_0 (AC)
+	real t_n = 3 * t_d;					//Time to reach p_0 from t_d (AC)
+	real b = 4;							//Decreasing coefficient (AC)
+	real density_0 = 1.1839;			//Ambient density at STP (AC)
 
-	real time;							//current time
-	bool explosion_done;				
+	real time;							//Current time passed (seconds)
+	real dt = 0.01;						//Timestep (seconds)
+	bool explosion_done;				//Determines whether or not we are only doing process 5
 
 	virtual void Initialize()
 	{
@@ -50,7 +51,7 @@ public:
 		div_vels.resize(node_num, 0);
 		vorticities.resize(node_num, 0);
 
-		//TODO: Initing particles
+		//TODO: Initiating particles
 	}
 
 	virtual void Advection(real dt)
@@ -92,10 +93,8 @@ public:
 	////Helper functions
 protected:
 
-	// This curve takes as input various predetermined times and coefficients (seems somewhat arbitrary)
-	// Everything but t should be a predetermined value that is global to ExplosionSim
 	// Returns pressure based on current time
-	virtual real pressureMagnitudeCurve(real t) {
+	real pressureMagnitudeCurve(real t) {
 
 		real output = p_0;
 		if (t <= t_d) {
@@ -115,7 +114,7 @@ protected:
 	}
 
 	// Returns density based on current time
-	real densityOpacityCurve(real t, real gamma) {
+	real densityOpacityCurve(real t) {
 
 		real output = (gamma + 1) * pressureMagnitudeCurve(t) + 2 * gamma * p_0;
 		output /= ((gamma - 1) * pressureMagnitudeCurve(t) + 2 * gamma * p_0);
@@ -125,7 +124,7 @@ protected:
 	}
 
 	// Returns velocity magnitude v_p(t)
-	real pressurePropagationCurve(real t, real gamma, real temperature) {
+	real pressurePropagationCurve(real t, real temperature) {
 
 		real c = getSpeedOfSoundInAir(temperature);
 		return c * sqrt(1 + ((gamma + 1) * (pressureMagnitudeCurve(t) / (2 * gamma * p_0)));
@@ -138,8 +137,9 @@ protected:
 	}
 
 	// returns velocity magnitude v(t)
-	real densityPropagationCurve(real t, real c, real gamma) {
+	real densityPropagationCurve(real t, real temperature) {
 
+		real c = getSpeedOfSoundInAir(temperature);
 		real output = 1 / sqrt(1 + (gamma + 1) * pressureMagnitudeCurve(t) / (2 * gamma * p_0));
 		output *= c;
 		output *= pressureMagnitudeCurve(t);
