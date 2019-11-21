@@ -20,8 +20,8 @@ public:
 	////Coordinate operations
     static VectorDi Coord(const int index,const VectorDi& counts);                      ////general index->coord
     VectorDi Node_Coord(const int index) const;			                                ////node index->node coord
-	VectorDi Cell_Coord(const int index) const;                                         ////cell index->cell coord
-	VectorDi Cell_Coord(const VectorD& pos) const;                                      ////pos->cell coord
+		VectorDi Cell_Coord(const int index) const;                                         ////cell index->cell coord
+		VectorDi Cell_Coord(const VectorD& pos) const;                                      ////pos->cell coord
 
     ////Position operations
     VectorD Node(const VectorDi& node) const;                                           ////node coord->node pos

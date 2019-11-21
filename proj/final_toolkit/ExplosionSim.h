@@ -3,6 +3,7 @@
 #include "Common.h"
 #include "Grid.h"
 
+#include <iostream>
 #include <fstream>
 #include <sys/types.h>
 #include <dirent.h>
@@ -22,9 +23,6 @@ public:
 	Array<real>    div_vels;							//Divergence  on grid cells
 	Array<real>	   vorticities;							//Vortices    on grid cells
 
-
-	//Hardcoded test variable
-	string directory_path;
 	Array<Array<real>> controlPaths;
 
 	////// Other Constants and Variables
@@ -92,7 +90,7 @@ public:
 		if (!explosion_done)
 		{
 			//TODO: Calculate Density Opacity
-			//TODO: Get nurbs curve value
+			//TODO: Get nurbs curve value - get_distance_traveled
 			//Get which cells need to be looked at rn - Sweep Region
 			//TODO: Density and Temperature in Sweep Region
 			//TODO: Make fuel particles
@@ -131,15 +129,26 @@ public:
 		}
 	}
 
-	virtual void PreProcessing(string dir_name){
+	virtual void PreProcessing(){//string dir_name){
 		// 	Intialize Variables
-		Array<String> file_names;
+		Array<std::string> file_names;
 
 		// open through directory, find array of text files
-		read_directory(dir_name, file_names)
-
+		read_directory("/Users/student/explosions/NURBS", file_names);
 
 		//for every textfile, call read_from_file, add to array
+		for(int i = 0; i<file_names.size(); i++){
+			controlPaths.append(read_from_file(file_names[i]));
+		}
+		std::ofstream outfile ("test.txt");
+
+		for(int i = 0; i<controlPaths.size(); i++){
+			outfile<<"-------------------------"<<std::endl;
+			for(int j = 0; j<controlPaths[i].size(); j++){
+				outfile<<string(controlPaths[i][j])<<std::endl;
+			}
+		}
+		outfile.close();
 
 
 	}
@@ -167,7 +176,7 @@ protected:
 
 	}
 
-	void read_directory(const string& name, Array<string> v)
+	void read_directory(const std::string& name, Array<std::string> v)
 	{
 			DIR* dirp = opendir(name.c_str());
 			struct dirent * dp;
@@ -178,27 +187,46 @@ protected:
 	}
 
 	//read points from file and create control paths
-	Array<real> read_from_file(string file_path){ //what params?
+	Array<real> read_from_file(std::string file_path){ //what params?
 		ifstream inFile;
+
+		Array<real> grid_indices;
 
 		//read from file given file path
 		inFile.open(file_path);
-		string data;
-		string stream_input;
-		//read from file, get array of points
+		std::string data;
+
+		//read from file, get string
 		if (!inFile) {
 			 cout << "Unable to open file";
 			 exit(1); // terminate with error
 	 	}
-		while(inFile >> stream_input){
-				data = data + stream_input;
+		for(std::string line; std::getline(inFile, line); ) {
+			Array<real> pointReals;
+			Vector3 point;
+
+			std::istringstream lineIterator(line);
+			Array<std::string> parsedLine(std::istream_iterator<std::string>{lineIterator},
+				std::istream_iterator<std::string>());
+
+			for(int i = 0; i<parsedLine.size(); i++){
+				pointReals.append((real)parsedLine[i]);
+			}
+			point = Vector3(pointReals.data());
+
+			VectorDi coordinates = Cell_Coord(point)
+
+			real index = Idx(coordinates);
+
+			grid_indices.append(index);
+
 		}
-
-
+		//process string, get array of points
 
 		// turn array of points into grid points
 
-		//return array
+		// return array
+
 	}
 
 	// Returns pressure based on current time
