@@ -93,7 +93,7 @@ public:
 		if (!explosion_done)
 		{
 			//TODO: Calculate Density Opacity
-			//TODO: Get nurbs curve value - get_distance_traveled
+			//TODO: Get nurbs curve value - getDensityFront, getPressureFront
 			//Get which cells need to be looked at rn - Sweep Region
 			//TODO: Density and Temperature in Sweep Region
 			//TODO: Make fuel particles
@@ -396,7 +396,7 @@ protected:
 	T lerp(T val1, T val2, real v) { return v * val2 + (1 - v) * val1; }
 
 
-	inline real distanceNd(VectorD pos1, VectorD pos2){
+	inline real distanceNd(VectorD& pos1, VectorD& pos2){
 		real distance = 0.0;
 		for(int i = 0; i<d; i++){
 			distance += (pos1[i] - pos2[i]) * (pos1[i] - pos2[i]);
