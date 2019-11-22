@@ -27,6 +27,7 @@ int main(int argc,char* argv[])
 
 		ExplosionSim<3> explode;
 		//pass directory path to driver
+		explode.Initialize();
 		explode.PreProcessing();
 
 		//ToolkitDriver<3> driver;

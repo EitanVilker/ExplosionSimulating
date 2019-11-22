@@ -5,6 +5,8 @@
 //#include "DCPQuery.h"
 #include "Particles.h"
 
+#include <stdlib.h>
+#include <string>
 #include <iostream>
 #include <fstream>
 #include <sys/types.h>
@@ -134,7 +136,8 @@ public:
 				// V(t_i) is the same for each grid square in the region
 
 				// TODO: calculate the following variable
-				Vector3i unitVectorTangentToControlPath;
+				// is supposed to be a real vector
+				Vector3 unitVectorTangentToControlPath;
 				velocities[i] = densityPropagationCurve(time, temps[i]) * unitVectorTangentToControlPath;
 			}
 		}
@@ -156,7 +159,7 @@ public:
 		for(int i = 0; i<controlPaths.size(); i++){
 			outfile<<"-------------------------"<<std::endl;
 			for(int j = 0; j<controlPaths[i].size(); j++){
-				outfile<<string(controlPaths[i][j])<<std::endl;
+				outfile<<std::to_string(controlPaths[i][j])<<std::endl;
 			}
 		}
 		outfile.close();
@@ -263,7 +266,11 @@ protected:
 				std::istream_iterator<std::string>());
 
 			for(int i = 0; i<parsedLine.size(); i++){
-				pointReals.push_back((real)parsedLine[i]);
+				char *end;
+				real f = std::strtof(parsedLine[i].c_str(), &end);
+				if(f!=0.0){
+					pointReals.push_back(f);
+				}
 			}
 			point = Vector3(pointReals.data());
 
@@ -382,13 +389,13 @@ protected:
 					u[Idx(Vector3i(cell[0] + 1, cell[1] + 1, cell[2]))],
 					frac[0]),
 				frac[1]),
-				lerp(u[Idx(Vector3i(cell[0], cell[1], cell[2] + 1)],
+				lerp(u[Idx(Vector3i(cell[0], cell[1], cell[2] + 1))],
 				u[Idx(Vector3i(cell[0] + 1, cell[1], cell[2] + 1))],
 				frac[0]),
 				lerp(u[Idx(Vector3i(cell[0], cell[1] + 1, cell[2] + 1))],
 					u[Idx(Vector3i(cell[0] + 1, cell[1] + 1, cell[2] + 1))],
 					frac[0]),
-				frac[1]),
+				frac[1],
 			frac[2]);
 	}
 
