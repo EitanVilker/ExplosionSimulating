@@ -2,7 +2,7 @@
 
 #include "Common.h"
 #include "Grid.h"
-#include "DCPQuery.h"
+//#include "DCPQuery.h"
 #include "Particles.h"
 
 #include <iostream>
@@ -45,12 +45,12 @@ public:
 	real t_n = 3 * t_d;					//Time to reach p_0 from t_d (AC)
 	real b = 4;							//Decreasing coefficient (AC)
 	real density_0 = 1.1839;			//Ambient density at STP (AC)
-	const p_scale = 0.5;        // scale the pressure by pressure velocity with this constant (randomly picked)
+	const real p_scale = 0.5;        // scale the pressure by pressure velocity with this constant (randomly picked)
 
 	//time
 	real time;							//Current time passed (seconds)
 	real dt = 0.01;						//Timestep (seconds)
-	const int d = 3;					//Number of dimensions
+	const int dim = 3;					//Number of dimensions
 
 	// Simulation
 	bool explosion_done;				//Determines whether or not we are only doing process 5
@@ -66,9 +66,9 @@ public:
 		//Resize arrays for all grid nodes
 		node_num = grid.node_counts.prod();
 		velocities.resize(node_num, VectorD::Zero());
-		densities.resize(node_num, d_amb);
+		densities.resize(node_num, density_0);
 		temps.resize(node_num, temp_amb);
-		pressures.resize(node_num, pres_atm);
+		pressures.resize(node_num, p_0);
 		div_vels.resize(node_num, 0);
 		vorticities.resize(node_num, 0);
 
@@ -112,7 +112,7 @@ public:
 		// w is radius of circle
 		// TODO: change distance from sphere to circle
 
-		for (int i = 0; i < cells.Size(); i++) {
+		for (int i = 0; i < cells.size(); i++) {
 
 			real distance = 0;
 			Vector3i currentCellCoordinates = Coord(i);
@@ -149,7 +149,7 @@ public:
 
 		//for every textfile, call read_from_file, add to array
 		for(int i = 0; i<file_names.size(); i++){
-			controlPaths.append(read_from_file(file_names[i]));
+			controlPaths.push_back(read_from_file(file_names[i]));
 		}
 		std::ofstream outfile ("test.txt");
 
@@ -165,35 +165,83 @@ public:
 	}
 
 
-////// Helper functions
+/////////////////////////////////// HELPER FUNCTIONS ///////////////////////////////////
 protected:
 	//get front of curve point
-	VectorD get_distance_traveled_chord(const real t, const real dt, const real temperature){
-		// call velocity from 0 to t by dt
+
+	/////////////////////////////////// Control Path Functions ///////////////////////////////////
+
+	//get the front of the density wave
+	 real getDensityFront(const real t, const real dt, const real temperature, const Array<real> path){
+		// variables
+		real curTime = 0;
+		real curDistance = 0;
+		real sumDistance = 0;
+		real curIndex = 1;
+		// sum the distance along the path
+		while(curTime<t){
+			sumDistance += densityPropagationCurve(curTime, temperature)*dt;
+			curTime += dt;
+		}
+		// find the point along the path corresponding to that distance
+		while(curDistance<sumDistance && (curIndex)<path.size()){
+			curDistance += distanceNd(path[curIndex], path[curIndex-1]);
+			curIndex++;
+		}
+		return path[curIndex];
 	}
 
-	inline real scale_by_distance(const real value, const real dist_trav, const real total_length){
+	// get the front of the pressure wave
+	real getPressureFront(const real t, const real dt, const real temperature, const Array<real> path){
+	 // variables
+	 real curTime = 0;
+	 real curDistance = 0;
+	 real sumDistance = 0;
+	 real curIndex = 1;
+	 // sum the distance along the path
+	 while(curTime<t){
+		 sumDistance += pressurePropagationCurve(curTime, temperature)*dt;
+		 curTime += dt;
+	 }
+	 // find the point along the path corresponding to that distance
+	 while(curDistance<sumDistance && (curIndex)<path.size()){
+		 curDistance += distanceNd(path[curIndex], path[curIndex-1]);
+		 curIndex++;
+	 }
+	 return path[curIndex];
+ }
 
+	inline real scale_by_distance(const real value, const real dist_trav, const real total_length){
+		return (value*total_length) / (dist_trav);
 	}
 
 	//find the length of a control path
-	real find_path_length(Array<VectorD>){
-
+	real find_path_length(Array<real> path){
+		real pathLength = 0.0;
+		for(int i = 1; i<path.size(); i++){
+			pathLength += distanceNd(path[i], path[i-1]);
+		}
+		return pathLength;
 	}
+
+/////////////////////////////////// Reading Directories and Files ///////////////////////////////////
 
 	void read_directory(const std::string& name, Array<std::string> v)
 	{
 			DIR* dirp = opendir(name.c_str());
-			struct dirent * dp;
+			struct dirent *dp;
 			while ((dp = readdir(dirp)) != NULL) {
-					v.push_back(dp->d_name);
+				size_t len = strlen(dp->d_name);
+				if(len > 4 && strcmp(dp->d_name + len - 4, ".txt") == 0){
+						v.push_back(dp->d_name);
+				}
 			}
 			closedir(dirp);
 	}
 
 	//read points from file and create control paths
 	Array<real> read_from_file(std::string file_path){ //what params?
-		ifstream inFile;
+		std::ifstream inFile;
 
 		Array<real> grid_indices;
 
@@ -203,7 +251,7 @@ protected:
 
 		//read from file, get string
 		if (!inFile) {
-			 cout << "Unable to open file";
+			 std::cout << "Unable to open file";
 			 exit(1); // terminate with error
 	 	}
 		for(std::string line; std::getline(inFile, line); ) {
@@ -215,15 +263,15 @@ protected:
 				std::istream_iterator<std::string>());
 
 			for(int i = 0; i<parsedLine.size(); i++){
-				pointReals.append((real)parsedLine[i]);
+				pointReals.push_back((real)parsedLine[i]);
 			}
 			point = Vector3(pointReals.data());
 
-			VectorDi coordinates = Cell_Coord(point)
+			VectorDi coordinates = grid.Cell_Coord(point);
 
 			real index = Idx(coordinates);
 
-			grid_indices.append(index);
+			grid_indices.push_back(index);
 
 		}
 		//process string, get array of points
@@ -234,12 +282,14 @@ protected:
 
 	}
 
+	/////////////////////////////////// Physics Helper Functions ///////////////////////////////////
+
 	// Returns pressure based on current time
 	real pressureMagnitudeCurve(real t) {
 
 		real output = p_0;
 		if (t <= t_d) {
-			output += P_p * (1 - t / t_d) * exp((-bt) / t_d);
+			output += P_p * (1 - t / t_d) * exp((-b*t) / t_d);
 		}
 		else if (t <= t_d + t_n / 2) {
 			output -= (2 * (P_m / t_n) * (t - t_d));
@@ -268,7 +318,7 @@ protected:
 	real pressurePropagationCurve(real t, real temperature) {
 
 		real c = getSpeedOfSoundInAir(temperature);
-		return c * sqrt(1 + ((gamma + 1) * (pressureMagnitudeCurve(t) / (2 * gamma * p_0)));
+		return c * sqrt(1 + ((gamma + 1) * (pressureMagnitudeCurve(t) / (2 * gamma * p_0))));
 	}
 
 	// returns velocity magnitude v(t)
@@ -294,8 +344,12 @@ protected:
 		return explosionTemp - 100000 * time;
 	}
 
+/////////////////////////////////// Interpolation and Distance ///////////////////////////////////
+
 	VectorD Interpolate(const Array<VectorD>& u, VectorD& pos)
 	{
+		//// define variables
+		const real one_over_dx = 1.0/grid.dx;
 		////clamp pos
 		for (int i = 0; i < d; i++) {
 			if (pos[i] < grid.domain_min[i])pos[i] = grid.domain_min[i];
@@ -321,14 +375,14 @@ protected:
 	{
 		return lerp(
 			lerp(
-				lerp(u[Idx(cell),
+				lerp(u[Idx(cell)],
 					u[Idx(Vector3i(cell[0] + 1, cell[1], cell[2]))],
 					frac[0]),
 				lerp(u[Idx(Vector3i(cell[0], cell[1] + 1, cell[2]))],
 					u[Idx(Vector3i(cell[0] + 1, cell[1] + 1, cell[2]))],
 					frac[0]),
 				frac[1]),
-				lerp(u[Idx(Vector3i(cell[0], cell[1], cell[2] + 1),
+				lerp(u[Idx(Vector3i(cell[0], cell[1], cell[2] + 1)],
 				u[Idx(Vector3i(cell[0] + 1, cell[1], cell[2] + 1))],
 				frac[0]),
 				lerp(u[Idx(Vector3i(cell[0], cell[1] + 1, cell[2] + 1))],
@@ -341,15 +395,18 @@ protected:
 	template <class T>
 	T lerp(T val1, T val2, real v) { return v * val2 + (1 - v) * val1; }
 
-	/*
-	/////
-	/////
-	Grid helper functions: REVIEW NECESSARY
-	/////
-	/////
-	/////
-	/////
-	*/
+
+	inline real distanceNd(VectorD pos1, VectorD pos2){
+		real distance = 0.0;
+		for(int i = 0; i<d; i++){
+			distance += (pos1[i] - pos2[i]) * (pos1[i] - pos2[i]);
+		}
+		return sqrt(distance);
+	}
+
+
+/////////////////////////////////// Grid Helper Functions ///////////////////////////////////
+
 	////return the node index given its coordinate
 	int Idx(const Vector3i& node_coord) const
 	{
