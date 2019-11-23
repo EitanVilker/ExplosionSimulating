@@ -6,6 +6,7 @@
 #include <iostream>
 #include "GridFluid.h"
 #include "ToolkitDriver.h"
+#include "ExplosionSim.h"
 
 #ifndef __Main_cpp__
 #define __Main_cpp__
@@ -13,15 +14,32 @@
 int main(int argc,char* argv[])
 {
 	int driver=1;
+	std::string directory_path;
+
+	// if there is an arg, it is the directory path
+	if(argc>0){
+		directory_path = argv[0];
+	}
+	// should have an else saying yo need a directory path
 
 	switch(driver){
 	case 1:{
-		ToolkitDriver<3> driver;
-		driver.Initialize();
-		driver.Run();	
+
+		ExplosionSim<3> explode;
+		//pass directory path to driver
+		explode.Initialize();
+		explode.PreProcessing();
+
+		for(int i = 0; i< 200; i++){
+			explode.Advance(0.01);
+		}
+
+		//ToolkitDriver<3> driver;
+		//driver.Initialize();
+		//driver.Run();
 	}break;
 	}
-	
+
 }
 
 #endif
