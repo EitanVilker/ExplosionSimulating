@@ -108,8 +108,8 @@ public:
 				//Get NURBS Curve Values - returns a grid index
 				//TODO - replace with current temperature??
 				int density_front = getDensityFront(time, dt, temp_amb, controlPaths[i]);
-				for(int node = 0, node<controlPaths[i].size(), node++){
-					real eq_rel_time  = time - st_times[node];
+				for(int node = 0; node<controlPaths[i].size(); node++){
+					real eq_rel_time  = time - st_times[i][node];
 					if(eq_rel_time>0){
 						//DO STUFF
 					}
@@ -183,28 +183,31 @@ public:
 			controlPaths.push_back(read_from_file(file_names[i]));
 		}
 
-		//////TESTING
-		std::ofstream outfile("test.txt");
-		for (int i = 0; i < controlPaths.size(); i++)
-		{
-			outfile << "-------------------------" << std::endl;
-			for (int j = 0; j < controlPaths[i].size(); j++)
-			{
-				outfile << std::to_string(controlPaths[i][j]) << std::endl;
-			}
-		}
-		outfile.close();
-		//////TESTING
 
 		//Assign times
-		for(int i=0; i<controlPaths.size(); i++{
+		for(int i=0; i<controlPaths.size(); i++){
 			real assign_time = 0.0;
+			Array<real> times_to_push;
 			for(int j=0; j<controlPaths[i].size(); j++){
-				st_times[j] = assign_time;
-				assign_time += dt
+				times_to_push.push_back(assign_time);
+				assign_time += dt;
 			}
+			st_times.push_back(times_to_push);
 		}
-	}
+
+			//////TESTING
+			std::ofstream outfile("test.txt");
+			for (int i = 0; i < controlPaths.size(); i++)
+			{
+				outfile << "-------------------------" << std::endl;
+				for (int j = 0; j < controlPaths[i].size(); j++)
+				{
+					outfile << std::to_string(controlPaths[i][j]) << " - " << std::to_string(st_times[i][j]) << std::endl;
+				}
+			}
+			outfile.close();
+			//////TESTING
+		}
 
 	///////////////////////////////////// HELPER FUNCTIONS ///////////////////////////////////////
 protected:
@@ -521,7 +524,7 @@ velocity into this equation since time is relative to a point?
 	bool : Represents if element is present in vector or not.
 	int : Represents the index of element in vector if its found else -1
 	*/
-	template < typename T> std::pair<bool, int > findInVector(const std::vector<T>  & vecOfElements, const T  & element)
+	template < typename T> int findInVector(const std::vector<T>  & vecOfElements, const T  & element)
 	{
 		int result;
 		// Find given element in vector
