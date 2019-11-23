@@ -31,6 +31,7 @@ public:
 	Array<real> vorticities;   //Vortices    on grid cells
 
 	Array<Array<int>> controlPaths;
+	Array<Array<real>> st_times;
 
 	////// Other Constants and Variables
 
@@ -40,6 +41,9 @@ public:
 	real w = 3; //Width of sweeping region- m (AC)
 
 	// Physics
+	//based on velocity of 7000 m/s
+	// t is scaled by T and length of control path
+	// so assign start time using dt?
 	const real gamma = 1.4;		  //Ratio of specific heats at ambient pressure (no units)
 	const real temp_amb = 25;	 //Ambient temperature- Celcius
 	const real p_0 = 1;			  //Ambient pressure at sea level- atm
@@ -97,8 +101,23 @@ public:
 		time += dt;
 		if (!explosion_done)
 		{
-			//TODO: Calculate Density Opacity
-			//TODO: Get nurbs curve value - getDensityFront, getPressureFront
+			//for each control path
+			for(int i = 0; i<controlPaths.size(); i++){
+				//TODO: Calculate Density Opacity
+
+				//Get NURBS Curve Values - returns a grid index
+				//TODO - replace with current temperature??
+				int density_front = getDensityFront(time, dt, temp_amb, controlPaths[i]);
+				for(int node = 0, node<controlPaths[i].size(), node++){
+					real eq_rel_time  = time - st_times[node];
+					if(eq_rel_time>0){
+						//DO STUFF
+					}
+				}
+
+			}
+
+
 			//Get which cells need to be looked at rn - Sweep Region
 			//TODO: Density and Temperature in Sweep Region
 			//TODO: Make fuel particles
@@ -163,6 +182,7 @@ public:
 		{
 			controlPaths.push_back(read_from_file(file_names[i]));
 		}
+
 		//////TESTING
 		std::ofstream outfile("test.txt");
 		for (int i = 0; i < controlPaths.size(); i++)
@@ -175,49 +195,66 @@ public:
 		}
 		outfile.close();
 		//////TESTING
+
+		//Assign times
+		for(int i=0; i<controlPaths.size(); i++{
+			real assign_time = 0.0;
+			for(int j=0; j<controlPaths[i].size(); j++){
+				st_times[j] = assign_time;
+				assign_time += dt
+			}
+		}
 	}
 
-	/////////////////////////////////// HELPER FUNCTIONS ///////////////////////////////////
+	///////////////////////////////////// HELPER FUNCTIONS ///////////////////////////////////////
 protected:
 	//get front of curve point
 
 	/////////////////////////////////// Control Path Functions ///////////////////////////////////
 
+	/*NOTE: may need to change for just finding next node, assuming velocity is constant... or how to incorporate
+velocity into this equation since time is relative to a point?
+	*/
 	//get the front of the density wave
-	real getDensityFront(const real t, const real dt, const real temperature, const Array<real> path)
+	int getDensityFront(const real t, const real dt, const real temperature, const Array<int> path)
 	{
 		// variables
 		real curTime = 0;
 		real curDistance = 0;
 		real sumDistance = 0;
-		real curIndex = 1;
+		int curIndex = 1;
 		// sum the distance along the path
+
 		while (curTime < t)
 		{
 			sumDistance += densityPropagationCurve(curTime, temperature) * dt;
 			curTime += dt;
 		}
+
 		// find the point along the path corresponding to that distance
+
 		while (curDistance < sumDistance && (curIndex) < path.size())
 		{
 			curDistance += distanceNd(path[curIndex], path[curIndex - 1]);
 			curIndex++;
 		}
+
 		return path[curIndex];
 	}
 
 	// get the front of the pressure wave
-	real getPressureFront(const real t, const real dt, const real temperature, const Array<real> path)
+	int getPressureFront(const real t, const real dt, const real temperature, const Array<int> path)
 	{
 		// variables
-		real curTime = 0;
+		real curTime = 0.0;
 		real curDistance = 0;
 		real sumDistance = 0;
-		real curIndex = 1;
+		int curIndex = 1;
 		// sum the distance along the path
 		while (curTime < t)
 		{
 			sumDistance += pressurePropagationCurve(curTime, temperature) * dt;
+
 			curTime += dt;
 		}
 		// find the point along the path corresponding to that distance
@@ -240,11 +277,14 @@ protected:
 		real pathLength = 0.0;
 		for (int i = 1; i < path.size(); i++)
 		{
-			pathLength += distanceNd(grid.Center(grid.Cell_Coord(path[i])), grid.Center(grid.Cell_Coord(path[i - 1])));
+			pathLength += distanceNd(path[i], path[i - 1]);
 		}
 		return pathLength;
 	}
 
+	real getStartTimeFromIndex(Array<int> path, int index){
+		return st_times[findInVector<int>(path, index)];
+	}
 	/////////////////////////////////// Reading Directories and Files ///////////////////////////////////
 
 	void read_directory(const std::string &name, Array<std::string> &v)
@@ -307,26 +347,24 @@ protected:
 	/////////////////////////////////// Physics Helper Functions ///////////////////////////////////
 
 	// Returns pressure based on current time
-	real pressureMagnitudeCurve(real t)
-	{
-
-		real output = p_0;
-		if (t <= t_d)
-		{
-			output += P_p * (1 - t / t_d) * exp((-b * t) / t_d);
-		}
-		else if (t <= t_d + t_n / 2)
-		{
-			output -= (2 * (P_m / t_n) * (t - t_d));
-		}
-		else if (t <= t_d + t_n)
-		{
-			output -= 2 * (P_m / t_n) * (t_d + t_n - t);
-		}
-		else
-		{
-			// do nothing, output should just be p_0
-		}
+	real pressureMagnitudeCurve(real t){
+			real output = p_0;
+			if (t <= t_d)
+			{
+				output += P_p * (1 - t / t_d) * exp((-b * t) / t_d);
+			}
+			else if (t <= t_d + t_n / 2)
+			{
+				output -= (2 * (P_m / t_n) * (t - t_d));
+			}
+			else if (t <= t_d + t_n)
+			{
+				output -= 2 * (P_m / t_n) * (t_d + t_n - t);
+			}
+			else
+			{
+				// do nothing, output should just be p_0
+			}
 
 		return output;
 	}
@@ -427,8 +465,10 @@ protected:
 	template <class T>
 	T lerp(T val1, T val2, real v) { return v * val2 + (1 - v) * val1; }
 
-	inline real distanceNd(VectorD &pos1, VectorD &pos2)
+	inline real distanceNd(const int index1, const int index2)
 	{
+		VectorD pos1 = Pos(Coord(index1));
+		VectorD pos2 = Pos(Coord(index2));
 		real distance = 0.0;
 		for (int i = 0; i < d; i++)
 		{
@@ -452,9 +492,9 @@ protected:
 	}
 
 	////return the node position given its index
-	VectorD Pos(const int node_index) const
+	VectorD Pos(const VectorDi& node) const
 	{
-		return grid.Node(node_index);
+		return grid.Node(node);
 	}
 
 	////check if a node is on the boundary of the grid
@@ -472,4 +512,23 @@ protected:
 	{
 		return Bnd(Coord(node_index));
 	}
+
+	////////////////////////////////// Other Helper Functions ///////////////////////////////////
+
+	/*
+	Generic function to find an element in vector and also its position.
+	It returns a pair of bool & int i.e.
+	bool : Represents if element is present in vector or not.
+	int : Represents the index of element in vector if its found else -1
+	*/
+	template < typename T> std::pair<bool, int > findInVector(const std::vector<T>  & vecOfElements, const T  & element)
+	{
+		int result;
+		// Find given element in vector
+		auto it = std::find(vecOfElements.begin(), vecOfElements.end(), element);
+		if (it != vecOfElements.end()){ result = distance(vecOfElements.begin(), it);}
+		else{ result = -1;}
+		return result;
+  }
+
 };

@@ -30,6 +30,10 @@ int main(int argc,char* argv[])
 		explode.Initialize();
 		explode.PreProcessing();
 
+		for(int i = 0; i< 200; i++){
+			explode.Advance(0.01);
+		}
+
 		//ToolkitDriver<3> driver;
 		//driver.Initialize();
 		//driver.Run();
