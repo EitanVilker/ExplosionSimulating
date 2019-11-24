@@ -252,15 +252,15 @@ public:
 	}
 
 	virtual void drasticPressureChange(real t, real temperature) {
-		
+
 		real M = pressurePropagationCurve(t, temperature) / getSpeedOfSoundInAir(temperature);
 		real a = -(M * M * gamma);
 		real b = 1 + 2 * M * M * gamma + a;
 		real c = M * M * gamma - a * a - (4 * gamma) / (gamma + 1) - 2 * q * a;
-		
+
 		// n is the change rate for 1 / density
-		real n = (8 * M * M * M * M * gamma * gamma) + (4 * M * M * gamma * gamma * a * a * gamma) - 
-			(16 * M * M * gamma * gamma) / (gamma + 1) - (8 * M * M * gamma * a * q) + 
+		real n = (8 * M * M * M * M * gamma * gamma) + (4 * M * M * gamma * gamma * a * a * gamma) -
+			(16 * M * M * gamma * gamma) / (gamma + 1) - (8 * M * M * gamma * a * q) +
 			(4 * M * M * gamma) + (a * a) + (2 * a) + 1);
 	}
 
@@ -276,18 +276,8 @@ public:
 
 			real distance = 0;
 			Vector3i currentCellCoordinates = Coord(i);
-<<<<<<< HEAD
-			for (int j = 0; j < d; j++)
-			{
-
-				distance += sqrt(pos[j] * pos[j] - currentCellCoordinates[j] * currentCellCoordinates[j]);
-			}
-//2,11,13,58,6
-			if (distance < w)
-=======
 			tangentVector = findTangent(pos);
-			if (abs((pos - currentCellCoordinates).norm().dot(tangentVector)) <= (dx * dx / 4)) 
->>>>>>> 049cf0da0401ee9eb40d5c029476698a342b02cc
+			if (abs((pos - currentCellCoordinates).norm().dot(tangentVector)) <= (dx * dx / 4))
 			{
 
 				// Allocate uniform density value to each grid square here based on densityOpacityCurve
