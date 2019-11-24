@@ -10,7 +10,7 @@
 #include <iostream>
 #include <fstream>
 #include <sys/types.h>
-#include <dirent.h>
+//#include <dirent.h>
 
 //////////////////////////////////////////////////////////////////////////
 ////Particle fluid simulator
@@ -86,12 +86,76 @@ public:
 
 	virtual void Advection(real dt)
 	{
+		////Advection using the semi-Lagrangian method
+		Array<VectorD> u_copy = velocities;
+		for (int i = 0; i < node_num; i++) {
+			
+			velocities[i] = VectorD::Zero();
+
+			VectorD position = Pos(i) - (u[i] * dt / 2);
+			velocities[i] = Interpolate(u_copy, position);
+			VectorD position_1 = Pos(i) - u[i] * dt;
+			velocities[i] = Interpolate(u_copy, position_1);
+		}
 	}
 
 	virtual void Projection()
 	{
+		real dx = grid.dx;
+		real dx2 = grid.dx * grid.dx;
+
+		////Projection step 1: calculate the velocity divergence on each node
+		////Read this sample code to learn how to access data with the node index and coordinate
+		std::fill(div_vels.begin(), div_vels.end(), (real)0);
+		for (int i = 0; i < node_num; i++) {
+
+			if (Bnd(i))continue;		////ignore the nodes on the boundary
+			VectorDi node = Coord(i);
+			div_vels[i] = (real)0;
+
+			for (int j = 0; j < d; j++) {
+
+				VectorD u_1 = velocities[Idx(node - VectorDi::Unit(j))];
+				VectorD u_2 = velocities[Idx(node + VectorDi::Unit(j))];
+				div_vels[i] += (u_2[j] - u_1[j]) / (2 * dx);
+			}
+		}
+
+		////Projection step 2: solve the Poisson's equation -lap p= div u 
+		////using the Gauss-Seidel iterations
+		std::fill(pressures.begin(), pressures.end(), (real)0);
+		for (int iter = 0; iter < 40; iter++) {
+			for (int i = 0; i < node_num; i++) {
+				
+				if (Bnd(i))continue;		////ignore the nodes on the boundary
+				VectorDi node = Coord(i);
+
+				real temp = 0;
+				for (int j = 0; j < d; j++) {
+					
+					temp += pressures[Idx(node + VectorDi::Unit(j))];
+					temp += pressures[Idx(node - VectorDi::Unit(j))];
+
+				}
+				pressures[i] = (-div_vels[i] + (1 / dx2) * temp) / (4 / dx2);
+			}
+		}
+
+		////Projection step 3: correct velocity with the pressure gradient
+		for (int i = 0; i < node_num; i++) {
+			if (Bnd(i))continue;		////ignore boundary nodes
+			VectorDi node = Coord(i);
+			VectorD grad_p = VectorD::Zero();
+
+			for (int j = 0; j < d; j++) {
+				grad_p[j] = (1 / (2 * dx)) * (pressures[Idx(node + VectorDi::Unit(j))] -
+					pressures[Idx(node - VectorDi::Unit(j))]);
+			}
+			velocities[i] -= grad_p;
+		}
 	}
 
+	// Probably don't need this- Bnd should do this
 	virtual void Set_Boundary_Conditions()
 	{
 	}
