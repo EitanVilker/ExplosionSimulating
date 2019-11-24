@@ -2,7 +2,6 @@
 
 #include "Common.h"
 #include "Grid.h"
-//#include "DCPQuery.h"
 #include "Particles.h"
 
 #include <stdlib.h>
@@ -10,7 +9,7 @@
 #include <iostream>
 #include <fstream>
 #include <sys/types.h>
-//#include <dirent.h>
+#include <dirent.h>
 
 //////////////////////////////////////////////////////////////////////////
 ////Particle fluid simulator
@@ -252,6 +251,19 @@ public:
 		Projection();
 	}
 
+	virtual void drasticPressureChange(real t, real temperature) {
+		
+		real M = pressurePropagationCurve(t, temperature) / getSpeedOfSoundInAir(temperature);
+		real a = -(M * M * gamma);
+		real b = 1 + 2 * M * M * gamma + a;
+		real c = M * M * gamma - a * a - (4 * gamma) / (gamma + 1) - 2 * q * a;
+		
+		// n is the change rate for 1 / density
+		real n = (8 * M * M * M * M * gamma * gamma) + (4 * M * M * gamma * gamma * a * a * gamma) - 
+			(16 * M * M * gamma * gamma) / (gamma + 1) - (8 * M * M * gamma * a * q) + 
+			(4 * M * M * gamma) + (a * a) + (2 * a) + 1);
+	}
+
 	virtual void SweepRegion(const VectorD &pos, Array<int> &cells)
 	{
 
@@ -264,6 +276,7 @@ public:
 
 			real distance = 0;
 			Vector3i currentCellCoordinates = Coord(i);
+<<<<<<< HEAD
 			for (int j = 0; j < d; j++)
 			{
 
@@ -271,6 +284,10 @@ public:
 			}
 //2,11,13,58,6
 			if (distance < w)
+=======
+			tangentVector = findTangent(pos);
+			if (abs((pos - currentCellCoordinates).norm().dot(tangentVector)) <= (dx * dx / 4)) 
+>>>>>>> 049cf0da0401ee9eb40d5c029476698a342b02cc
 			{
 
 				// Allocate uniform density value to each grid square here based on densityOpacityCurve
@@ -286,7 +303,7 @@ public:
 				// TODO: calculate the following variable
 				// is supposed to be a real vector
 				Vector3 unitVectorTangentToControlPath;
-				velocities[i] = densityPropagationCurve(time, temps[i]) * unitVectorTangentToControlPath;
+				velocities[i] = densityPropagationCurve(time, temps[i]) * tangentVector;
 			}
 		}
 	}
@@ -432,23 +449,23 @@ protected:
 
 	// Returns pressure based on current time
 	real pressureMagnitudeCurve(real t){
-			real output = p_0;
-			if (t <= t_d)
-			{
-				output += P_p * (1 - t / t_d) * exp((-b * t) / t_d);
-			}
-			else if (t <= t_d + t_n / 2)
-			{
-				output -= (2 * (P_m / t_n) * (t - t_d));
-			}
-			else if (t <= t_d + t_n)
-			{
-				output -= 2 * (P_m / t_n) * (t_d + t_n - t);
-			}
-			else
-			{
-				// do nothing, output should just be p_0
-			}
+		real output = p_0;
+		if (t <= t_d)
+		{
+			output += P_p * (1 - t / t_d) * exp((-b * t) / t_d);
+		}
+		else if (t <= t_d + t_n / 2)
+		{
+			output -= (2 * (P_m / t_n) * (t - t_d));
+		}
+		else if (t <= t_d + t_n)
+		{
+			output -= 2 * (P_m / t_n) * (t_d + t_n - t);
+		}
+		else
+		{
+			// do nothing, output should just be p_0
+		}
 
 		return output;
 	}
