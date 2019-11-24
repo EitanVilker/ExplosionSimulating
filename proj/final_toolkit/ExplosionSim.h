@@ -89,7 +89,7 @@ public:
 		////Advection using the semi-Lagrangian method
 		Array<VectorD> u_copy = velocities;
 		for (int i = 0; i < node_num; i++) {
-			
+
 			velocities[i] = VectorD::Zero();
 
 			VectorD position = Pos(i) - (u[i] * dt / 2);
@@ -121,18 +121,18 @@ public:
 			}
 		}
 
-		////Projection step 2: solve the Poisson's equation -lap p= div u 
+		////Projection step 2: solve the Poisson's equation -lap p= div u
 		////using the Gauss-Seidel iterations
 		std::fill(pressures.begin(), pressures.end(), (real)0);
 		for (int iter = 0; iter < 40; iter++) {
 			for (int i = 0; i < node_num; i++) {
-				
+
 				if (Bnd(i))continue;		////ignore the nodes on the boundary
 				VectorDi node = Coord(i);
 
 				real temp = 0;
 				for (int j = 0; j < d; j++) {
-					
+
 					temp += pressures[Idx(node + VectorDi::Unit(j))];
 					temp += pressures[Idx(node - VectorDi::Unit(j))];
 
@@ -283,7 +283,7 @@ protected:
 velocity into this equation since time is relative to a point?
 	*/
 	//get the front of the density wave
-	int getDensityFront(const real t, const real dt, const real temperature, const Array<int> path)
+	int getFront(const real t)
 	{
 		// variables
 		real curTime = 0;
@@ -309,34 +309,6 @@ velocity into this equation since time is relative to a point?
 		return path[curIndex];
 	}
 
-	// get the front of the pressure wave
-	int getPressureFront(const real t, const real dt, const real temperature, const Array<int> path)
-	{
-		// variables
-		real curTime = 0.0;
-		real curDistance = 0;
-		real sumDistance = 0;
-		int curIndex = 1;
-		// sum the distance along the path
-		while (curTime < t)
-		{
-			sumDistance += pressurePropagationCurve(curTime, temperature) * dt;
-
-			curTime += dt;
-		}
-		// find the point along the path corresponding to that distance
-		while (curDistance < sumDistance && (curIndex) < path.size())
-		{
-			curDistance += distanceNd(path[curIndex], path[curIndex - 1]);
-			curIndex++;
-		}
-		return path[curIndex];
-	}
-
-	inline real scale_by_distance(const real value, const real dist_trav, const real total_length)
-	{
-		return (value * total_length) / (dist_trav);
-	}
 
 	//find the length of a control path
 	real find_path_length(Array<int> path)
@@ -351,6 +323,25 @@ velocity into this equation since time is relative to a point?
 
 	real getStartTimeFromIndex(Array<int> path, int index){
 		return st_times[findInVector<int>(path, index)];
+	}
+
+	// give array and index of the array you are looking at
+	// wait we need unqiue positions on the control path, so this functiom has to look for unique positions
+	VectorD findTangent(int index, Array<int> path)
+	{
+		int node = path[index];
+		int j = index;
+		while (j>1 && j<path.size()-1 && path[j]==node){
+			j--;
+		}
+		VectorD	pos1 = Pos(Coords(path[j]));
+		j = index;
+		while (j>1 && j<path.size()-1 && path[j]==node){
+			j++;
+		}
+  	VectorD	pos2 = Pos(Coords(path[j]));
+		VectorD result = (pos2-pos1).norm();
+		return result;
 	}
 	/////////////////////////////////// Reading Directories and Files ///////////////////////////////////
 
@@ -479,6 +470,23 @@ velocity into this equation since time is relative to a point?
 	real getCurrentExplosionTemp()
 	{
 		return explosionTemp - 100000 * time;
+	}
+
+	VectorD updateVorticity(const real dt, const real dx, int index){
+		VectorDi node = Coord(index);
+
+		VectorD ip= velocities[Idx(node+VectorDi::Unit(0))];
+		VectorD in= velocities[Idx(node-VectorDi::Unit(0))];
+		VectorD jp= velocities[Idx(node+VectorDi::Unit(1))];
+		VectorD jn= velocities[Idx(node-VectorDi::Unit(1))];
+		VectorD kp= velocities[Idx(node+VectorDi::Unit(2))];
+		VectorD kn= velocities[Idx(node-VectorDi::Unit(2))];
+
+		Vector3 result = Vector3((jp[2]-jn[2])-(kp[1]-kn[1]),(kp[0]-kn[0])-(ip[2]-in[2]), (ip[1]-in[1])-(jp[0]-jn[0]));
+
+		return(1.0/(2.0*dx)) * result);
+
+
 	}
 
 	/////////////////////////////////// Interpolation and Distance ///////////////////////////////////
