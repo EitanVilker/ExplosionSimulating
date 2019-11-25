@@ -248,14 +248,6 @@ public:
 
 		}
 
-			//Get which cells need to be looked at rn - Sweep Region
-			//TODO:- Density and Temperature in Sweep Region
-			//TODO: Make fuel particles
-			//TODO:- Calculate propagation velocity magnitude of density
-			//TODO:- Create vortex particles
-			//TODO:- Amplify pressure fields by detonation-y stuff
-			//TODO: Vortical effects
-
 		Vorticity_Confinement(dt, sweepRegions);
 		Advection(dt);
 		Projection();
@@ -337,7 +329,7 @@ public:
 		{
 			int numJ = path[j];
 			VectorD posJ = Pos(Coord(numJ));
-			VectorD tangentVectorJ = findTangent(numJ, path);
+			VectorD tangentVectorJ = findTangent(j, path);
 			real length_to_index = find_path_length(path, j);
 			for (int k = 0; k < cells.size(); k++)
 			{
