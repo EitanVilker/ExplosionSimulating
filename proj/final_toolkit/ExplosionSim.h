@@ -420,6 +420,75 @@ velocity into this equation since time is relative to a point?
 
 	/////////////////////////////////// Physics Helper Functions ///////////////////////////////////
 
+	Vector3i calculateColor(real temperature) {
+
+		Vector3i returnColor;
+		real adjustedTemp = temperature / 100;
+
+		// Calculate red
+		if (adjustedTemp <= 66) {
+			returnColor[0] = 255;
+		}
+		else {
+			returnColor[0] = adjustedTemp - 60;
+			returnColor[0] = 329.698727446 * pow(returnColor[0], -0.1332047592);
+			
+			if (returnColor[0] < 0) {
+				returnColor[0] = 0;
+			}
+			else if (returnColor[0] > 255) {
+				returnColor[0] = 255;
+			}
+			
+		}
+
+		// Calculate green
+		if (adjustedTemp <= 66) {
+			returnColor[1] = adjustedTemp;
+			returnColor[1] = 99.4708025861 * log(returnColor[1]) - 161.1195681661;
+
+			if (returnColor[1] < 0) {
+				returnColor[1] = 0;
+			}
+			else if (returnColor[1] > 255) {
+				returnColor[1] = 255;
+			}
+		}
+		else {
+			returnColor[1] = adjustedTemp - 60;
+			returnColor[1] = 288.1221695283 * pow(returnColor[1], -0.0755148492);
+			
+			if (returnColor[1] < 0) {
+				returnColor[1] = 0;
+			}
+			else if (returnColor[1] > 255) {
+				returnColor[1] = 255;
+			}
+		}
+
+		// Calculate blue
+		if (adjustedTemp >= 66) {
+			returnColor[2] = 255;
+		}
+		else if (adjustedTemp <= 19){
+			returnColor[2] = 0;
+		}
+		else {
+			returnColor[2] = adjustedTemp - 10;
+			returnColor[2] = 138.5177312231 * log(returnColor[2]) - 305.0447927307;
+			if (returnColor[2] < 0) {
+				returnColor[2] = 0;
+			}
+			else if (returnColor[2] > 255) {
+				returnColor[2] = 255;
+			}
+		}
+
+		returnColor /= 255;
+
+		return returnColor;
+	}
+
 	// Returns pressure based on current time
 	real pressureMagnitudeCurve(real t){
 		real output = p_0;
