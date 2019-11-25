@@ -90,6 +90,8 @@ public:
 	virtual void Advection(real dt)
 	{
 		////Advection using the semi-Lagrangian method
+
+		// Nothing major changed from grid-fluid here
 		Array<VectorD> u_copy = velocities;
 		for (int i = 0; i < node_num; i++) {
 
@@ -104,6 +106,8 @@ public:
 
 	virtual void Projection()
 	{
+		// Nothing major changed from grid-fluid here
+
 		real dx = grid.dx;
 		real dx2 = grid.dx * grid.dx;
 
@@ -215,12 +219,6 @@ public:
 
 
 
-
-	// Probably don't need this- Bnd should do this
-	virtual void Set_Boundary_Conditions()
-	{
-	}
-
 	virtual void Advance(const real dt)
 	{
 		time += dt;
@@ -262,6 +260,7 @@ public:
 		Advection(dt);
 		Projection();
 		
+		// Reduce temperatures everywhere down to minimum of ambient by arbitrary value
 		for (int j = 0; j < temps.Size(); ++j) {
 			if (temps[j] < temp_amb + 100) {
 				temps[j] = temp_amb;
@@ -290,6 +289,7 @@ public:
 		writeFile.close();
 	}
 
+	// Don't seem to need this for now, delete if unused by end of project
 	virtual void drasticPressureChange(real t, real temperature) {
 		real M = pressurePropagationCurve(t, temperature) / getSpeedOfSoundInAir(temperature);
 		real a = -(M * M * gamma);
@@ -302,6 +302,7 @@ public:
 			(4 * M * M * gamma) + (a * a) + (2 * a) + 1;
 	}
 
+	// Function that looks at a circle perpendicular to the control path and updates values in that circle
 	virtual void SweepRegion(int index, Array<int> &cells, Array<int> &path)
 	{
 		//eq_pos_time = start time for index. with the current time step it should be 0
@@ -328,7 +329,6 @@ public:
 				// Allocate direction velocity to each grid square according to u_d(G(g)) = V(t_i)t(g), where g is a grid square,
 				// G(g) is the set of grid square in the region, and t(g) is the unit tangent vector derived from g on the flow control path
 				// V(t_i) is the same for each grid square in the region
-
 				velocities[i] = densityPropagationCurve(time, temps[i]) * tangentVector;
 			}
 		}
@@ -344,6 +344,7 @@ public:
 				Vector3i currentCellCoordinatesK = Coord(k);
 			  if (abs((posJ - currentCellCoordinatesK).normalized().dot(tangentVectorJ)) <= (grid.dx * grid.dx / 4))
 				{
+					// If Mach number < 1, at detonation state and should scale up pressure and temperature by same amount
 					if (pressurePropagationCurve(time) / getSpeedOfSoundInAir(temps[k]) > 1)
 					{
 						// Pressure, temperature scaling here quite arbitrary
@@ -496,9 +497,9 @@ protected:
 	/////////////////////////////////// Physics Helper Functions ///////////////////////////////////
 
 	// Returns color based on blackbody radiation principles and current temperature 
-	Vector3i calculateColor(real temperature) {
+	Vector3 calculateColor(real temperature) {
 
-		Vector3i returnColor;
+		Vector3 returnColor;
 		real adjustedTemp = temperature / 100;
 
 		// Calculate red
