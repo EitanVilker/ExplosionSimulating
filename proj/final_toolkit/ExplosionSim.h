@@ -55,6 +55,7 @@ public:
 	real b = 4;					  //Decreasing coefficient (AC)
 	real density_0 = 1.1839;	  //Ambient density at STP (AC)
 	const real p_scale = 0.5;	 // scale the pressure by pressure velocity with this constant (randomly picked)
+	real q = 500.0;
 
 	//time
 	real time;		   //Current time passed (seconds)
@@ -92,9 +93,9 @@ public:
 
 			velocities[i] = VectorD::Zero();
 
-			VectorD position = Pos(i) - (u[i] * dt / 2);
+			VectorD position = Pos(Coord(i)) - (velocities[i] * dt / 2);
 			velocities[i] = Interpolate(u_copy, position);
-			VectorD position_1 = Pos(i) - u[i] * dt;
+			VectorD position_1 = Pos(Coord(i)) - velocities[i] * dt;
 			velocities[i] = Interpolate(u_copy, position_1);
 		}
 	}
@@ -156,54 +157,59 @@ public:
 	}
 
 /* NOTE: change to only work on the paths?? Probably*/
-	void Vorticity_Confinement(const real dt, A)
+	void Vorticity_Confinement(const real dt, Array<Array<int>> sweep_cells)
 	{
 		real dx=grid.dx;
-
-	                ////Vorticity confinement step 1: update vorticity
+              ////Vorticity confinement step 1: update vorticity
 		std::fill(vorticities.begin(),vorticities.end(),(real)0);
-	  for(int i=0;i<node_num;i++)
+		for(int m = 0; m<sweep_cells.size(); m++)
 		{
-	  	if(Bnd(i))continue;             ////ignore boundary nodes
-	    VectorDi node=Coord(i);
-
-			vorticities[i]
-
-	  }
-
-		////Vorticity confinement step 2: update N = (grad(|vor|)) / |grad(|vor|)|
-		Array<VectorD> N(node_num,VectorD::Zero());
-		for(int i=0;i<node_num;i++)
-		{
-			if(Bnd(i))continue;             ////ignore boundary nodes
-			VectorDi node=Coord(i);
-			N[i]=VectorD::Zero();
-
-	    // Calculate divergence of vorticity (same as projection step 1 code)
-			for(int j=0;j<d;j++)
+		  for(int j=0;j<sweep_cells[m].size();j++)
 			{
-	    	real vor_1=vor[Idx(node-VectorDi::Unit(j))];
-	    	real vor_2=vor[Idx(node+VectorDi::Unit(j))];
-	    	N[i][j] = (vor_2 - vor_1);
-	    }
+				int i = sweep_cells[m][j];
+				if(Bnd(i)){continue;}             ////ignore boundary nodes
+		    VectorDi node=Coord(i);
 
- 			//Normalize
-	    N[i].normalize();
+				vorticities[i] = updateVorticity(dt, dx, node);
 
-	  }
+		  }
 
-	  ////Vorticity confinement step 3: calculate confinement force and use it to update velocity
-	  real vor_conf_coef=(real)4;
-	  for(int i=0;i<node_num;i++)
-		{
-	  	if(Bnd(i))continue;             ////ignore boundary nodes
-	    VectorD f=vor_conf_coef*dx*Cross(N[i],vor[i]);
-	    velocities[i]+=f*dt;     ////we don't have mass by assuming density=1
-	  }
+			////Vorticity confinement step 2: update N = (grad(|vor|)) / |grad(|vor|)|
+			Array<VectorD> N(node_num,VectorD::Zero());
+			for(int k=0;k<sweep_cells[m].size();k++)
+			{
+				int i = sweep_cells[m][k];
+				if(Bnd(i)){continue;}             ////ignore boundary nodes
+				VectorDi node=Coord(i);
+				N[i]=VectorD::Zero();
+
+		    // Calculate divergence of vorticity (same as projection step 1 code)
+				for(int j=0;j<d;j++)
+				{
+		    	real vor_1=vorticities[Idx(node-VectorDi::Unit(j))];
+		    	real vor_2=vorticities[Idx(node+VectorDi::Unit(j))];
+		    	N[i][j] = (vor_2 - vor_1);
+		    }
+
+	 			//Normalize
+		    N[i].normalize();
+
+		  }
+
+		  ////Vorticity confinement step 3: calculate confinement force and use it to update velocity
+		  real vor_conf_coef=(real)4;
+			for(int j=0;j<sweep_cells[m].size();j++)
+	 	 	{
+	 		  int i = sweep_cells[m][j];
+		  	if(Bnd(i)){continue;}             ////ignore boundary nodes
+		    VectorD f=vor_conf_coef*dx*Cross(N[i],vorticities[i]);
+		    velocities[i]+=f*dt;     ////we don't have mass by assuming density=1
+		  }
+		}
 	}
-	inline Vector3 Cross(const Vector2& v,const real w) const
-	(a2 * b3 – a3 * b2) * i + (a1 * b3 – a3 * b1) * j + (a1 * b1 – a2 * b1) * k
-         {return Vector3(v[1]*w,-v[0]*w);}
+	inline Vector3 Cross(const Vector3& a,const Vector3& b) const
+	{return Vector3( (a[1] * b[2] - a[2] * b[1]), (a[0] * b[2] - a[2] * b[0]), (a[0] * b[1] - a[1] * b[0]));}
+
 
 
 
@@ -216,28 +222,31 @@ public:
 	{
 		time += dt;
 		cur_index += 1;
+
+		Array<Array<int>> sweepRegions;
+
 		if (!explosion_done)
 		{
 			//for each control path
-			for(int i = 0; i<controlPaths.size(); i++){
+			for(int i = 0; i<controlPaths.size(); i++)
+			{
 				//TODO: Calculate Density Opacity
 
 				//for each node behind the current one
-				for(int node = 0; node<controlPaths[i].size(); node++)
-				{
-					//find relative time to front
-					int grid_cell = controlPaths[i][node];
-					real eq_rel_time  = time - st_times[i][node];
-					Array<int> sweepRegion;
-					// ARGGGG
-					SweepRegion(Pos(Coords(grid_cell)), sweepRegion);
+				///////// FIX THIS LOGIC
 
-					}
+					//find relative time to front
+					int grid_cell = controlPaths[i][cur_index];
+					Array<int> sweepRegion;
+					SweepRegion(grid_cell, sweepRegion, controlPaths[i]);
+					sweepRegions.push_back(sweepRegion);
+					//add pressure here
+					for(int node = 0; node<controlPaths[i].size(); node++)
+					{
 				}
 			}
 
 		}
-
 
 			//Get which cells need to be looked at rn - Sweep Region
 			//TODO:- Density and Temperature in Sweep Region
@@ -246,13 +255,13 @@ public:
 			//TODO:- Create vortex particles
 			//TODO:- Amplify pressure fields by detonation-y stuff
 			//TODO: Vortical effects
-		}
+
+		Vorticity_Confinement(dt, sweepRegions);
 		Advection(dt);
 		Projection();
 	}
 
 	virtual void drasticPressureChange(real t, real temperature) {
-
 		real M = pressurePropagationCurve(t, temperature) / getSpeedOfSoundInAir(temperature);
 		real a = -(M * M * gamma);
 		real b = 1 + 2 * M * M * gamma + a;
@@ -261,30 +270,32 @@ public:
 		// n is the change rate for 1 / density
 		real n = (8 * M * M * M * M * gamma * gamma) + (4 * M * M * gamma * gamma * a * a * gamma) -
 			(16 * M * M * gamma * gamma) / (gamma + 1) - (8 * M * M * gamma * a * q) +
-			(4 * M * M * gamma) + (a * a) + (2 * a) + 1);
+			(4 * M * M * gamma) + (a * a) + (2 * a) + 1;
 	}
 
-	virtual void SweepRegion(const VectorD &pos, Array<int> &cells)
+	virtual void SweepRegion(int index, Array<int> &cells, Array<int> &path)
 	{
+		//eq_pos_time = start time for index. with the current time step it should be 0
 
-		// pos is center of circle
-		// w is radius of circle
-		// TODO: change distance from sphere to circle
-
+		// use dot product to scale time values.
+		VectorD pos = Pos(Coord(index));
 		for (int i = 0; i < cells.size(); i++)
-		{
 
 			real distance = 0;
-			Vector3i currentCellCoordinates = Coord(i);
-			tangentVector = findTangent(pos);
-			if (abs((pos - currentCellCoordinates).norm().dot(tangentVector)) <= (dx * dx / 4))
+			Vector3i currentCellCoordinates = Coord(index);
+			VectorD tangentVector = findTangent(pos, path);
+			if (abs((pos - currentCellCoordinates).normalize().dot(tangentVector)) <= (grid.dx * grid.dx / 4))
 			{
+				//since time should be 0 relative to start point, this should give relative time to position
+				real cell_eq_time = (((pos - currentCellCoordinates).dot(tangentVector))/grid.dx)*dt;
 
+
+				cells.push_back(index);
 				// Allocate uniform density value to each grid square here based on densityOpacityCurve
-				densities[i] = densityOpacityCurve(time);
+				densities[index] = densityOpacityCurve(cell_eq_time);
 
 				// Allocate user-specified uniform temperature value, based upon how much time has passed, to each grid square
-				temps[i] = getCurrentExplosionTemp();
+				temps[index] = getCurrentExplosionTemp();
 
 				// Allocate direction velocity to each grid square according to u_d(G(g)) = V(t_i)t(g), where g is a grid square,
 				// G(g) is the set of grid square in the region, and t(g) is the unit tangent vector derived from g on the flow control path
@@ -293,7 +304,7 @@ public:
 				// TODO: calculate the following variable
 				// is supposed to be a real vector
 				Vector3 unitVectorTangentToControlPath;
-				velocities[i] = densityPropagationCurve(time, temps[i]) * tangentVector;
+				velocities[i] = densityPropagationCurve(cell_eq_time, temps[i]) * tangentVector;
 			}
 		}
 	}
@@ -344,7 +355,7 @@ protected:
 
 	/////////////////////////////////// Control Path Functions ///////////////////////////////////
 	//find the length of a control path
-	real find_path_length(Array<int> path)
+	real find_path_length(const Array<int> &path)
 	{
 		real pathLength = 0.0;
 		for (int i = 1; i < path.size(); i++)
@@ -354,26 +365,27 @@ protected:
 		return pathLength;
 	}
 
-	real getStartTimeFromIndex(Array<int> path, int index){
+  //shouldn't need this at all
+	real getStartTimeFromIndex(const Array<int> &path, int index){
 		return st_times[findInVector<int>(path, index)];
 	}
 
 	// give array and index of the array you are looking at
 	// wait we need unqiue positions on the control path, so this functiom has to look for unique positions
-	VectorD findTangent(int index, Array<int> path)
+	VectorD findTangent(int index, const Array<int> &path)
 	{
 		int node = path[index];
 		int j = index;
 		while (j>1 && j<path.size()-1 && path[j]==node){
 			j--;
 		}
-		VectorD	pos1 = Pos(Coords(path[j]));
+		VectorD	pos1 = Pos(Coord(path[j]));
 		j = index;
 		while (j>1 && j<path.size()-1 && path[j]==node){
 			j++;
 		}
-  	VectorD	pos2 = Pos(Coords(path[j]));
-		VectorD result = (pos2-pos1).norm();
+  	VectorD	pos2 = Pos(Coord(path[j]));
+		VectorD result = (pos2-pos1).normalize();
 		return result;
 	}
 	/////////////////////////////////// Reading Directories and Files ///////////////////////////////////
@@ -533,7 +545,6 @@ protected:
 	// Returns density based on current time
 	real densityOpacityCurve(real t)
 	{
-
 		real output = (gamma + 1) * pressureMagnitudeCurve(t) + 2 * gamma * p_0;
 		output /= ((gamma - 1) * pressureMagnitudeCurve(t) + 2 * gamma * p_0);
 		output *= density_0;
@@ -544,7 +555,6 @@ protected:
 	// Returns velocity magnitude v_p(t)
 	real pressurePropagationCurve(real t, real temperature)
 	{
-
 		real c = getSpeedOfSoundInAir(temperature);
 		return c * sqrt(1 + ((gamma + 1) * (pressureMagnitudeCurve(t) / (2 * gamma * p_0))));
 	}
@@ -575,8 +585,7 @@ protected:
 		return explosionTemp - 100000 * time;
 	}
 
-	VectorD updateVorticity(const real dt, const real dx, int index){
-		VectorDi node = Coord(index);
+	VectorD updateVorticity(const real dt, const real dx, VectorDi node){
 
 		VectorD ip= velocities[Idx(node+VectorDi::Unit(0))];
 		VectorD in= velocities[Idx(node-VectorDi::Unit(0))];
@@ -589,7 +598,7 @@ protected:
 														(kp[0]-kn[0])-(ip[2]-in[2]),
 														(ip[1]-in[1])-(jp[0]-jn[0]));
 
-		return(1.0/(2.0*dx)) * result);
+		return((1.0/(2.0*dx)) * result);
 
 
 	}
