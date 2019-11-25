@@ -31,7 +31,8 @@ public:
 	Array<Vector3> colors;		// Contains colors of each grid cell in RGB
 
 	Array<Array<int>> controlPaths;
-	Array<Array<real>> st_times;
+	Array<Array<VectorD>> pts;
+	Array<real> pathLengths;
 
 	////// Other Constants and Variables
 
@@ -142,9 +143,8 @@ public:
 
 					temp += pressures[Idx(node + VectorDi::Unit(j))];
 					temp += pressures[Idx(node - VectorDi::Unit(j))];
-
 				}
-				pressures[i] = (-div_vels[i] + (1 / dx2) * temp) / (4 / dx2);
+				pressures[i] = (-div_vels[i] + (1 / dx2) * temp) / (6 / dx2);
 			}
 		}
 
@@ -167,57 +167,51 @@ public:
 	{
 		real dx=grid.dx;
               ////Vorticity confinement step 1: update vorticity
-		std::fill(vorticities.begin(),vorticities.end(),Vector3::Zero();
+		std::fill(vorticities.begin(),vorticities.end(),Vector3::Zero());
 		for(int m = 0; m<sweep_cells.size(); m++)
 		{
-		  for(int j=0;j<sweep_cells[m].size();j++)
+			for(int j=0;j<sweep_cells[m].size();j++)
 			{
 				int i = sweep_cells[m][j];
 				if(Bnd(i)){continue;}             ////ignore boundary nodes
-		    VectorDi node=Coord(i);
+				VectorDi node=Coord(i);
 
-			// Applying 3.4.6 in a more simplified manner, we scale the vorticity by the temperature in the sweepRegion
-			vorticities[i] = updateVorticity(dt, dx, node) * temps[i];
+				// Applying 3.4.6 in a more simplified manner, we scale the vorticity by the temperature in the sweepRegion
+				vorticities[i] = updateVorticity(dt, dx, node) * temps[i];
 
-		  }
+			}
 
 			////Vorticity confinement step 2: update N = (grad(|vor|)) / |grad(|vor|)|
 			Array<VectorD> N(node_num,VectorD::Zero());
-			for(int k=0;k<sweep_cells[m].size();k++)
+			for (int k = 0; k < sweep_cells[m].size(); k++)
 			{
 				int i = sweep_cells[m][k];
-				if(Bnd(i)){continue;}             ////ignore boundary nodes
-				VectorDi node=Coord(i);
-				N[i]=VectorD::Zero();
+				if (Bnd(i)) { continue; }             ////ignore boundary nodes
+				VectorDi node = Coord(i);
+				N[i] = VectorD::Zero();
 
-		    // Calculate divergence of vorticity (same as projection step 1 code)
-				for(int j=0;j<d;j++)
+				// Calculate divergence of vorticity (same as projection step 1 code)
+				for (int j = 0; j < d; j++)
 				{
-		    	real vor_1=vorticities[Idx(node-VectorDi::Unit(j))];
-		    	real vor_2=vorticities[Idx(node+VectorDi::Unit(j))];
-		    	N[i][j] = (vor_2 - vor_1);
-		    }
-
-	 			//Normalize
-		    N[i].normalize();
-
-		  }
+					real vor_1 = vorticities[Idx(node - VectorDi::Unit(j))][j];
+					real vor_2 = vorticities[Idx(node + VectorDi::Unit(j))][j];
+					N[i][j] = (vor_2 - vor_1);
+				}
+				//Normalize
+				N[i].normalize();
+			}
+		}
 
 		  ////Vorticity confinement step 3: calculate confinement force and use it to update velocity
 		  real vor_conf_coef=(real)4;
-			for(int j=0;j<sweep_cells[m].size();j++)
-	 	 	{
+		  for(int j=0;j<sweep_cells[m].size();j++)
+	 	  {
 	 		  int i = sweep_cells[m][j];
-		  	if(Bnd(i)){continue;}             ////ignore boundary nodes
-		    VectorD f=vor_conf_coef*dx*Cross(N[i],vorticities[i]);
-		    velocities[i]+=f*dt;     ////we don't have mass by assuming density=1
+		  	  if(Bnd(i)){continue;}             ////ignore boundary nodes
+			  VectorD f = vor_conf_coef * dx * N[i].cross(vorticities[i]);
+			  velocities[i]+=f*dt;     ////we don't have mass by assuming density=1
 		  }
-		}
 	}
-	inline Vector3 Cross(const Vector3& a,const Vector3& b) const
-	{return Vector3( (a[1] * b[2] - a[2] * b[1]), (a[0] * b[2] - a[2] * b[0]), (a[0] * b[1] - a[1] * b[0]));}
-
-
 
 	virtual void Advance(const real dt)
 	{
@@ -231,29 +225,19 @@ public:
 			//for each control path
 			for(int i = 0; i<controlPaths.size(); i++)
 			{
-				//TODO: Calculate Density Opacity
-
-				//for each node behind the current one
-				///////// FIX THIS LOGIC
-
 					int grid_cell = controlPaths[i][cur_index];
 					Array<int> sweepRegion;
-					SweepRegion(grid_cell, &sweepRegion, &controlPaths[i]);
+					SweepRegion(grid_cell, sweepRegion, i);
 					sweepRegions.push_back(sweepRegion);
-					//add pressure here
-					for (int node = 0; node < controlPaths[i].size(); node++)
-					{
-					}
 			}
-
 		}
 
-		Vorticity_Confinement(dt, sweepRegions);
 		Advection(dt);
 		Projection();
+		Vorticity_Confinement(dt, sweepRegions);
 		
 		// Reduce temperatures everywhere down to minimum of ambient by arbitrary value
-		for (int j = 0; j < temps.Size(); ++j) {
+		for (int j = 0; j < temps.size(); ++j) {
 			if (temps[j] < temp_amb + 100) {
 				temps[j] = temp_amb;
 			}
@@ -263,17 +247,17 @@ public:
 		}
 
 		// Update colors here to help with writing to renderer
-		for (int j = 0; j < colors.Size(); j++) {
+		for (int j = 0; j < colors.size(); j++) {
 			colors[j] = calculateColor(temps[j]);
 		}
 
 		// Write rendering data to new file
 
-		ofstream writeFile;
-		writeFile.open("explosions_" + to_string(cur_index) +".txt");	//TODO put in the correct folder
+		std::ofstream writeFile;
+		writeFile.open("explosions_" + std::to_string(cur_index) +".txt");	//TODO put in the correct folder
 		writeFile << n_per_dim << " " << n_per_dim << " " << n_per_dim << "\n";
 		writeFile << "0 0 0" << "\n";
-		writeFile << n_per_dim * dx << " " << n_per_dim * dx << " " << n_per_dim * dx << "\n";
+		writeFile << n_per_dim * grid.dx << " " << n_per_dim * grid.dx << " " << n_per_dim * grid.dx << "\n";
 		for (int cell_idx = 0; cell_idx < node_num; ++cell_idx)
 		{
 			writeFile << densities[cell_idx] << " " << colors[cell_idx][0] << " " << colors[cell_idx][1] << " " << colors[cell_idx][2] << "\n";
@@ -281,69 +265,63 @@ public:
 		writeFile.close();
 	}
 
-	// Don't seem to need this for now, delete if unused by end of project
-	virtual void drasticPressureChange(real t, real temperature) {
-		real M = pressurePropagationCurve(t, temperature) / getSpeedOfSoundInAir(temperature);
-		real a = -(M * M * gamma);
-		real b = 1 + 2 * M * M * gamma + a;
-		real c = M * M * gamma - a * a - (4 * gamma) / (gamma + 1) - 2 * q * a;
-
-		// n is the change rate for 1 / density
-		real n = (8 * M * M * M * M * gamma * gamma) + (4 * M * M * gamma * gamma * a * a * gamma) -
-			(16 * M * M * gamma * gamma) / (gamma + 1) - (8 * M * M * gamma * a * q) +
-			(4 * M * M * gamma) + (a * a) + (2 * a) + 1;
-	}
-
 	// Function that looks at a circle perpendicular to the control path and updates values in that circle
-	virtual void SweepRegion(int index, Array<int> &cells, Array<int> &path)
+	virtual void SweepRegion(int index, Array<int> &cells, int pathNum)
 	{
-		//eq_pos_time = start time for index. with the current time step it should be 0
+		VectorD tangentVector = findTangent(cur_index, pathNum);
 
-		// use dot product to scale time values.
-		VectorD pos = Pos(Coord(index));
-		for (int i = 0; i < cells.size(); i++)
-
-			real distance = 0;
-			Vector3i currentCellCoordinates = Coord(index);
-			VectorD tangentVector = findTangent(pos, path);
-			if (abs((pos - currentCellCoordinates).normalize().dot(tangentVector)) <= (grid.dx * grid.dx / 4))
-			{
-				//since time should be 0 relative to start point, this should give relative time to position
-				real cell_eq_time = (((pos - currentCellCoordinates).dot(tangentVector))/grid.dx)*dt;
-
-				cells.push_back(index);
-				// Allocate uniform density value to each grid square here based on densityOpacityCurve
-				densities[index] = densityOpacityCurve(cell_eq_time);
-
-				// Allocate user-specified uniform temperature value, based upon how much time has passed, to each grid square
-				temps[index] = explosionTemp;
-
-				// Allocate direction velocity to each grid square according to u_d(G(g)) = V(t_i)t(g), where g is a grid square,
-				// G(g) is the set of grid square in the region, and t(g) is the unit tangent vector derived from g on the flow control path
-				// V(t_i) is the same for each grid square in the region
-				velocities[i] = densityPropagationCurve(time, temps[i]) * tangentVector;
-			}
-		}
-		real L_p = pathLengths[pathNum];	// Distance for pressure control path segment
-		for (int j = 0; j < index; j++)
+		Vector3i coord = Coord(index);
+		VectorD pos = Pos(coord);
+		real bound = grid.dx * grid.dx / 4.0f;
+		for (int i = -3; i < 3; i++) for (int j = -3; j < 3; j++) for (int k = -3; k < 3; k++)
 		{
-			int numJ = path[j];
-			VectorD posJ = Pos(Coord(numJ));
-			VectorD tangentVectorJ = findTangent(j, path);
-			real length_to_index = find_path_length(path, j);
-			for (int k = 0; k < cells.size(); k++)
+			Vector3i curr = coord + Vector3i(i, j, k);
+			if (!grid.Valid_Node(curr)) continue;
+			Vector3 diff = pos - grid.Center(curr);
+			if (diff.norm() > (w * grid.dx)) continue;
+			if (abs((pos - grid.Center(curr)).normalized().dot(tangentVector)) > bound) continue;
+			
+			int id = grid.Cell_Index(curr);
+			cells.push_back(id);
+			densities[id] = densityOpacityCurve(time);
+			temps[id] = explosionTemp;
+			velocities[id] = densityPropagationCurve(time, temps[i]) * tangentVector;
+		}
+
+		real L_p = pathLengths[pathNum];	// Distance for pressure control path segment
+		real bigPt = pressures[index] * pressurePropagationCurve(time, temps[index]) * 0.1;
+		// go through every node from front
+		for (int prevnode= 0; prevnode < cur_index; prevnode++)
+		{
+			//get grid index
+			int prevIndex = controlPaths[pathNum][prevnode];
+			//get grid coords
+			VectorDi prevIndexCoord = Coord(prevIndex);
+			//get grid position
+			VectorD prevIndexPos = Pos(prevIndexCoord);
+			
+			VectorD tangentVectorPrev = findTangent(prevnode, pathNum);
+			real lengthToPrevIndex = find_path_length(controlPaths[pathNum], prevnode);
+			
+			for (int i = -3; i < 3; i++) for (int j = -3; j < 3; j++) for (int k = -3; k < 3; k++)
 			{
-				Vector3i currentCellCoordinatesK = Coord(k);
-			  if (abs((posJ - currentCellCoordinatesK).normalized().dot(tangentVectorJ)) <= (grid.dx * grid.dx / 4))
+
+				Vector3i curr = prevIndexCoord + Vector3i(i, j, k);
+				if (!grid.Valid_Node(curr)) continue;
+				Vector3 diff = prevIndexPos - grid.Center(curr);
+				if (diff.norm() > (w * grid.dx)) continue;
+				if (abs((prevIndexPos - grid.Center(curr)).normalized().dot(tangentVectorPrev)) > bound) continue;
+				// If Mach number < 1, at detonation state and should scale up pressure and temperature by same amount
+				if (pressurePropagationCurve(time, temps[Idx(curr)]) / getSpeedOfSoundInAir(temps[Idx(curr)]) > 1)
 				{
-					// If Mach number < 1, at detonation state and should scale up pressure and temperature by same amount
-					if (pressurePropagationCurve(time) / getSpeedOfSoundInAir(temps[k]) > 1)
-					{
-						// Pressure, temperature scaling here quite arbitrary
-						pressures[k] *= 100;
-						temps[k] *= 100;
-					}
+					// Pressure, temperature scaling here quite arbitrary
+					pressures[Idx(curr)] *= 100;
+					temps[Idx(curr)] *= 100;
 				}
+				if (lengthToPrevIndex < (0.5 * L_p))
+					pressures[Idx(curr)] = bigPt * 0.4;
+				else
+					pressures[Idx(curr)] = bigPt * (2 * ((lengthToPrevIndex / L_p) - 0.5) * 0.6 + 0.4);
 			}
 		}
 	}
@@ -355,38 +333,18 @@ public:
 
 		// open through directory, find array of text files
 		read_directory("/Users/student/explosions/NURBS/", file_names);
-
 		//for every textfile, call read_from_file, add to array
 		for (int i = 0; i < file_names.size(); i++)
 		{
-			controlPaths.push_back(read_from_file(file_names[i]));
+			read_from_file(file_names[i]);
 		}
 
-
-		//Assign times
-		for(int i=0; i<controlPaths.size(); i++){
-			real assign_time = 0.0;
-			Array<real> times_to_push;
-			for(int j=0; j<controlPaths[i].size(); j++){
-				times_to_push.push_back(assign_time);
-				assign_time += dt;
-			}
-			st_times.push_back(times_to_push);
+		//predetermine lengths for every path
+		for (int i = 0; i < controlPaths.size(); i++)
+		{
+			pathLengths.push_back(find_path_length(controlPaths[i], controlPaths[i].size()));
 		}
-
-			//////TESTING
-			std::ofstream outfile("test.txt");
-			for (int i = 0; i < controlPaths.size(); i++)
-			{
-				outfile << "-------------------------" << std::endl;
-				for (int j = 0; j < controlPaths[i].size(); j++)
-				{
-					outfile << std::to_string(controlPaths[i][j]) << " - " << std::to_string(st_times[i][j]) << std::endl;
-				}
-			}
-			outfile.close();
-			//////TESTING
-		}
+	}
 
 	///////////////////////////////////// HELPER FUNCTIONS ///////////////////////////////////////
 protected:
@@ -394,38 +352,23 @@ protected:
 
 	/////////////////////////////////// Control Path Functions ///////////////////////////////////
 	//find the length of a control path
-	real find_path_length(const Array<int> &path)
+	real find_path_length(const Array<int> &path, int stop)
 	{
 		real pathLength = 0.0;
-		for (int i = 1; i < path.size(); i++)
+		for (int i = 1; i < path.size() && i<stop; i++)
 		{
 			pathLength += distanceNd(path[i], path[i - 1]);
 		}
 		return pathLength;
 	}
 
-  //shouldn't need this at all
-	real getStartTimeFromIndex(const Array<int> &path, int index){
-		return st_times[findInVector<int>(path, index)];
-	}
-
 	// give array and index of the array you are looking at
 	// wait we need unqiue positions on the control path, so this functiom has to look for unique positions
-	VectorD findTangent(int index, const Array<int> &path)
+	VectorD findTangent(int index, int path)
 	{
-		int node = path[index];
-		int j = index;
-		while (j>1 && j<path.size()-1 && path[j]==node){
-			j--;
-		}
-		VectorD	pos1 = Pos(Coord(path[j]));
-		j = index;
-		while (j>1 && j<path.size()-1 && path[j]==node){
-			j++;
-		}
-  	VectorD	pos2 = Pos(Coord(path[j]));
-		VectorD result = (pos2-pos1).normalize();
-		return result;
+		if (index == 0) return (pts[path][index + 1] - pts[path][index]).normalized();
+		if (index == pts[path].size() - 1) return (pts[path][index] - pts[path][index - 1]).normalized();
+		return (pts[path][index + 1] - pts[path][index - 1]).normalized();
 	}
 	/////////////////////////////////// Reading Directories and Files ///////////////////////////////////
 
@@ -445,15 +388,15 @@ protected:
 	}
 
 	//read points from file and create control paths
-	Array<int> read_from_file(std::string file_path)
+	void read_from_file(std::string file_path)
 	{ //what params?
 		std::ifstream inFile;
 
-		Array<int> grid_indices;
+		controlPaths.push_back(Array<int>());
+		pts.push_back(Array<VectorD>());
 
 		//read from file given file path
 		inFile.open(file_path);
-		std::string data;
 
 		//read from file, get string
 		if (!inFile)
@@ -462,28 +405,14 @@ protected:
 			exit(1); // terminate with error
 		}
 
-		for (std::string line; std::getline(inFile, line);)
+		while (inFile.good())
 		{
-			Array<real> pointReals;
-			VectorD point;
-			std::istringstream in(line);
-			for (std::string numb; std::getline(in, numb, ',');)
-			{
-				char *end;
-				real push = std::strtof(numb.c_str(), &end);
-				pointReals.push_back(push);
-			}
-
-			point = VectorD(pointReals.data());
-
-			VectorDi coordinates = grid.Cell_Coord(point);
-
-			int index = Idx(coordinates);
-			grid_indices.push_back(index);
+			VectorD curr_pt; for (int i = 0; i < dim; i++) inFile >> curr_pt[i];
+			pts.back().emplace_back(curr_pt);
+			controlPaths.back().emplace_back(Idx(grid.Cell_Coord(curr_pt)));
 		}
-		inFile.close();
 
-		return grid_indices;
+		inFile.close();
 	}
 
 	/////////////////////////////////// Physics Helper Functions ///////////////////////////////////
@@ -553,7 +482,7 @@ protected:
 			}
 		}
 
-		returnColor /= 255;
+		returnColor /= 255.f;
 
 		return returnColor;
 	}
@@ -572,10 +501,6 @@ protected:
 		else if (t <= t_d + t_n)
 		{
 			output -= 2 * (P_m / t_n) * (t_d + t_n - t);
-		}
-		else
-		{
-			// do nothing, output should just be p_0
 		}
 
 		return output;
@@ -692,12 +617,7 @@ protected:
 	{
 		VectorD pos1 = Pos(Coord(index1));
 		VectorD pos2 = Pos(Coord(index2));
-		real distance = 0.0;
-		for (int i = 0; i < d; i++)
-		{
-			distance += (pos1[i] - pos2[i]) * (pos1[i] - pos2[i]);
-		}
-		return sqrt(distance);
+		return (pos1 - pos2).norm();
 	}
 
 	/////////////////////////////////// Grid Helper Functions ///////////////////////////////////
@@ -735,23 +655,4 @@ protected:
 	{
 		return Bnd(Coord(node_index));
 	}
-
-	////////////////////////////////// Other Helper Functions ///////////////////////////////////
-
-	/*
-	Generic function to find an element in vector and also its position.
-	It returns a pair of bool & int i.e.
-	bool : Represents if element is present in vector or not.
-	int : Represents the index of element in vector if its found else -1
-	*/
-	template < typename T> int findInVector(const std::vector<T>  & vecOfElements, const T  & element)
-	{
-		int result;
-		// Find given element in vector
-		auto it = std::find(vecOfElements.begin(), vecOfElements.end(), element);
-		if (it != vecOfElements.end()){ result = distance(vecOfElements.begin(), it);}
-		else{ result = -1;}
-		return result;
-  }
-
 };
