@@ -263,6 +263,15 @@ public:
 		Vorticity_Confinement(dt, sweepRegions);
 		Advection(dt);
 		Projection();
+		
+		for (int j = 0; j < temps.Size(); ++j) {
+			if (temps[j] < temp_amb + 100) {
+				temps[j] = temp_amb;
+			}
+			else {
+				temps[j] -= 100;
+			}
+		}
 
 		// Update colors here to help with writing to renderer
 		for (int j = 0; j < colors.Size(); j++) {
@@ -329,7 +338,7 @@ public:
 				densities[index] = densityOpacityCurve(cell_eq_time);
 
 				// Allocate user-specified uniform temperature value, based upon how much time has passed, to each grid square
-				temps[index] = getCurrentExplosionTemp();
+				temps[index] = explosionTemp;
 
 				// Allocate direction velocity to each grid square according to u_d(G(g)) = V(t_i)t(g), where g is a grid square,
 				// G(g) is the set of grid square in the region, and t(g) is the unit tangent vector derived from g on the flow control path
@@ -625,13 +634,7 @@ protected:
 		return 331.5 + 0.6 * temperature;
 	}
 
-	// Returns uniform temperature value based on time elapsed
-	real getCurrentExplosionTemp()
-	{
-		return explosionTemp - 100000 * time;
-	}
-
-	VectorD updateVorticity(const real dt, const real dx, VectorDi node){
+3	VectorD updateVorticity(const real dt, const real dx, VectorDi node){
 
 		VectorD ip= velocities[Idx(node+VectorDi::Unit(0))];
 		VectorD in= velocities[Idx(node-VectorDi::Unit(0))];
