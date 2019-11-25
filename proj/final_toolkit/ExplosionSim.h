@@ -29,12 +29,8 @@ public:
 	Array<real> temps;		   //Temperature on grid cells
 	Array<real> pressures;	 //Pressure    on grid cells
 	Array<real> div_vels;	  //Divergence  on grid cells
-<<<<<<< HEAD
-	Array<Vector3> vorticities;   //Vortices    on grid cells
-=======
-	Array<real> vorticities;   //Vortices    on grid cells
-	Array<Vector3i> colors;		// Contains colors of each grid cell in RGB
->>>>>>> a9494fe9a104116b739c373057a8836a2f67fb79
+	Array<VectorD> vorticities;	//Vortices    on grid cells
+	Array<Vector3> colors;		// Contains colors of each grid cell in RGB
 
 	Array<Array<int>> controlPaths;
  	Array<real> pathLengths;
@@ -87,12 +83,8 @@ public:
 		temps.resize(node_num, temp_amb);
 		pressures.resize(node_num, p_0);
 		div_vels.resize(node_num, 0);
-<<<<<<< HEAD
-		vorticities.resize(node_num, Vector3::Zero());
-=======
 		vorticities.resize(node_num, 0);
-		colors.resize(node_num, 0);
->>>>>>> a9494fe9a104116b739c373057a8836a2f67fb79
+		colors.resize(node_num, Vector3(0));
 
 		//TODO: Initiating particles
 	}
@@ -273,29 +265,17 @@ public:
 			colors[j] = calculateColor(temps[j]);
 		}
 
-		Array<real> colors2;
-		colors2.resize(node_num * 3, 0);
-		for (int j = 0; j < colors.Size(); j++) {
-			for (int k = 0; k < 3; k++) {
-				colors2.push_back(colors[j][k]);
-			}
-		}
-
 		// Write rendering data to new file
-		char const* densitytoChar = reinterpret_cast<char const*>(densities);
-		std::string s(densitytoChar, densitytoChar + sizeof densities);
-
-		// Doesn't work because colors contains vectors not ints
-		char const* colortoChar = reinterpret_cast<char const*>(colors2);
-		std::string s(colortoChar, colortoChar + sizeof colors2);
 
 		ofstream writeFile;
-		writeFile.open("explosions_" + to_string(cur_index) +".txt");
-		cout << "" + to_string(n_per_dim) + to_string(n_per_dim) + to_string(n_per_dim) << end1;
-		cout << "0 0 0" << end1;
-		cout << "" + to_string(n_per_dim * dx) + to_string(n_per_dim * dx) + to_string(n_per_dim * dx) << end1;
-		cout << densitytoChar << end1;
-		cout << colortoChar << end1;
+		writeFile.open("explosions_" + to_string(cur_index) +".txt");	//TODO put in the correct folder
+		writeFile << n_per_dim << " " << n_per_dim << " " << n_per_dim << "\n";
+		writeFile << "0 0 0" << "\n";
+		writeFile << n_per_dim * dx << " " << n_per_dim * dx << " " << n_per_dim * dx << "\n";
+		for (int cell_idx = 0; cell_idx < node_num; ++cell_idx)
+		{
+			writeFile << densities[cell_idx] << " " << colors[cell_idx][0] << " " << colors[cell_idx][1] << " " << colors[cell_idx][2] << "\n";
+		}
 		
 		writeFile.close();
 	}
@@ -689,8 +669,7 @@ protected:
 			frac[2]);
 	}
 
-	template <class T>
-	T lerp(T val1, T val2, real v) { return v * val2 + (1 - v) * val1; }
+	Vector3 lerp(Vector3 val1, Vector3 val2, real v) { return v * val2 + (1 - v) * val1; }
 
 	inline real distanceNd(const int index1, const int index2)
 	{
