@@ -31,7 +31,7 @@ public:
 	Array<Vector3> colors;		// Contains colors of each grid cell in RGB
 
 	Array<Array<int>> controlPaths;
-	Array<Array<real>> st_times;
+	Array<real> pathLengths;
 
 	////// Other Constants and Variables
 
@@ -167,52 +167,50 @@ public:
 	{
 		real dx=grid.dx;
               ////Vorticity confinement step 1: update vorticity
-		std::fill(vorticities.begin(),vorticities.end(),Vector3::Zero();
+		std::fill(vorticities.begin(),vorticities.end(),Vector3::Zero());
 		for(int m = 0; m<sweep_cells.size(); m++)
 		{
-		  for(int j=0;j<sweep_cells[m].size();j++)
+			for(int j=0;j<sweep_cells[m].size();j++)
 			{
 				int i = sweep_cells[m][j];
 				if(Bnd(i)){continue;}             ////ignore boundary nodes
-		    VectorDi node=Coord(i);
+				VectorDi node=Coord(i);
 
-			// Applying 3.4.6 in a more simplified manner, we scale the vorticity by the temperature in the sweepRegion
-			vorticities[i] = updateVorticity(dt, dx, node) * temps[i];
+				// Applying 3.4.6 in a more simplified manner, we scale the vorticity by the temperature in the sweepRegion
+				vorticities[i] = updateVorticity(dt, dx, node) * temps[i];
 
-		  }
+			}
 
 			////Vorticity confinement step 2: update N = (grad(|vor|)) / |grad(|vor|)|
 			Array<VectorD> N(node_num,VectorD::Zero());
-			for(int k=0;k<sweep_cells[m].size();k++)
+			for (int k = 0; k < sweep_cells[m].size(); k++)
 			{
 				int i = sweep_cells[m][k];
-				if(Bnd(i)){continue;}             ////ignore boundary nodes
-				VectorDi node=Coord(i);
-				N[i]=VectorD::Zero();
+				if (Bnd(i)) { continue; }             ////ignore boundary nodes
+				VectorDi node = Coord(i);
+				N[i] = VectorD::Zero();
 
-		    // Calculate divergence of vorticity (same as projection step 1 code)
-				for(int j=0;j<d;j++)
+				// Calculate divergence of vorticity (same as projection step 1 code)
+				for (int j = 0; j < d; j++)
 				{
-		    	real vor_1=vorticities[Idx(node-VectorDi::Unit(j))];
-		    	real vor_2=vorticities[Idx(node+VectorDi::Unit(j))];
-		    	N[i][j] = (vor_2 - vor_1);
-		    }
-
-	 			//Normalize
-		    N[i].normalize();
-
-		  }
+					real vor_1 = vorticities[Idx(node - VectorDi::Unit(j))];
+					real vor_2 = vorticities[Idx(node + VectorDi::Unit(j))];
+					N[i][j] = (vor_2 - vor_1);
+				}
+				//Normalize
+				N[i].normalize();
+			}
+		}
 
 		  ////Vorticity confinement step 3: calculate confinement force and use it to update velocity
 		  real vor_conf_coef=(real)4;
-			for(int j=0;j<sweep_cells[m].size();j++)
-	 	 	{
+		  for(int j=0;j<sweep_cells[m].size();j++)
+	 	  {
 	 		  int i = sweep_cells[m][j];
-		  	if(Bnd(i)){continue;}             ////ignore boundary nodes
-		    VectorD f=vor_conf_coef*dx*Cross(N[i],vorticities[i]);
-		    velocities[i]+=f*dt;     ////we don't have mass by assuming density=1
+		  	  if(Bnd(i)){continue;}             ////ignore boundary nodes
+			  VectorD f=vor_conf_coef*dx*Cross(N[i],vorticities[i]);
+			  velocities[i]+=f*dt;     ////we don't have mass by assuming density=1
 		  }
-		}
 	}
 	inline Vector3 Cross(const Vector3& a,const Vector3& b) const
 	{return Vector3( (a[1] * b[2] - a[2] * b[1]), (a[0] * b[2] - a[2] * b[0]), (a[0] * b[1] - a[1] * b[0]));}
@@ -302,11 +300,11 @@ public:
 		// use dot product to scale time values.
 		VectorD pos = Pos(Coord(index));
 		for (int i = 0; i < cells.size(); i++)
-
+		{
 			real distance = 0;
 			Vector3i currentCellCoordinates = Coord(index);
-			VectorD tangentVector = findTangent(pos, path);
-			if (abs((pos - currentCellCoordinates).normalize().dot(tangentVector)) <= (grid.dx * grid.dx / 4))
+			VectorD tangentVector = findTangent(index, path);
+			if (abs((pos - currentCellCoordinates).normalized().dot(tangentVector)) <= (grid.dx * grid.dx / 4))
 			{
 				//since time should be 0 relative to start point, this should give relative time to position
 				real cell_eq_time = (((pos - currentCellCoordinates).dot(tangentVector))/grid.dx)*dt;
@@ -752,6 +750,6 @@ protected:
 		if (it != vecOfElements.end()){ result = distance(vecOfElements.begin(), it);}
 		else{ result = -1;}
 		return result;
-  }
+	}
 
 };
