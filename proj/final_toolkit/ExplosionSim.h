@@ -336,7 +336,7 @@ public:
 			//grab the position of the cell
 			VectorD posJ = Pos(Coord(numJ));
 			//get the tangent vector at cell J
-			VectorD tangentVectorJ = findTangent(numJ, path);
+			VectorD tangentVectorJ = findTangent(j, path);
 			//grab the length of the control path to point J
 			real length_to_index = find_path_length(path, j);
 			//for every cell in the grid, find the cells in the sweep region of J
