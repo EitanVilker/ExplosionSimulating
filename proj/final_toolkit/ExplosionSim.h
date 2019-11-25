@@ -236,15 +236,14 @@ public:
 				//for each node behind the current one
 				///////// FIX THIS LOGIC
 
-					//find relative time to front
 					int grid_cell = controlPaths[i][cur_index];
 					Array<int> sweepRegion;
-					SweepRegion(grid_cell, sweepRegion, controlPaths[i]);
+					SweepRegion(grid_cell, &sweepRegion, &controlPaths[i]);
 					sweepRegions.push_back(sweepRegion);
 					//add pressure here
-					for(int node = 0; node<controlPaths[i].size(); node++)
+					for (int node = 0; node < controlPaths[i].size(); node++)
 					{
-				}
+					}
 			}
 
 		}
@@ -302,10 +301,23 @@ public:
 				// G(g) is the set of grid square in the region, and t(g) is the unit tangent vector derived from g on the flow control path
 				// V(t_i) is the same for each grid square in the region
 
-				// TODO: calculate the following variable
-				// is supposed to be a real vector
-				Vector3 unitVectorTangentToControlPath;
 				velocities[i] = densityPropagationCurve(cell_eq_time, temps[i]) * tangentVector;
+<<<<<<< HEAD
+=======
+				
+				real L_p = 0;	// Distance for pressure control path segment
+				for (int j = 0; j < index; j++) {
+
+					//TODO: Get index of location j along the control path
+					L_p += pressurePropagationCurve(cell_eq_time, temps[j]) * dt;
+				}
+
+				if (pressurePropagationCurve(cell_eq_time) / getSpeedOfSoundInAir(temps[i]) > 1) {
+					// Pressure, temperature scaling here quite arbitrary
+					pressures[i] *= 100;
+					temps[i] *= 100;
+				}
+>>>>>>> 3d4cac95ac0c6e07f6c854f04ea02a400fdaf07a
 			}
 		}
 	}
@@ -563,6 +575,8 @@ protected:
 	}
 
 	// Returns velocity magnitude v_p(t)
+	// The scale adjustment is applied to v_p based on both the control path length and the propagation distance 
+	// at the pressure propagation curve
 	real pressurePropagationCurve(real t, real temperature)
 	{
 		real c = getSpeedOfSoundInAir(temperature);
