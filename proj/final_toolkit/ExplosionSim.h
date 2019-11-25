@@ -5,11 +5,13 @@
 #include "Particles.h"
 
 #include <stdlib.h>
+#include <algorithm>
 #include <string>
 #include <iostream>
 #include <fstream>
 #include <sys/types.h>
 #include <dirent.h>
+using namespace std;
 
 //////////////////////////////////////////////////////////////////////////
 ////Particle fluid simulator
@@ -28,6 +30,7 @@ public:
 	Array<real> pressures;	 //Pressure    on grid cells
 	Array<real> div_vels;	  //Divergence  on grid cells
 	Array<real> vorticities;   //Vortices    on grid cells
+	Array<Vector3i> colors;		// Contains colors of each grid cell in RGB
 
 	Array<Array<int>> controlPaths;
 	Array<Array<real>> st_times;
@@ -81,6 +84,7 @@ public:
 		pressures.resize(node_num, p_0);
 		div_vels.resize(node_num, 0);
 		vorticities.resize(node_num, 0);
+		colors.resize(node_num, 0);
 
 		//TODO: Initiating particles
 	}
@@ -259,6 +263,37 @@ public:
 		Vorticity_Confinement(dt, sweepRegions);
 		Advection(dt);
 		Projection();
+
+		// Update colors here to help with writing to renderer
+		for (int j = 0; j < colors.Size(); j++) {
+			colors[j] = calculateColor(temps[j]);
+		}
+
+		Array<real> colors2;
+		colors2.resize(node_num * 3, 0);
+		for (int j = 0; j < colors.Size(); j++) {
+			for (int k = 0; k < 3; k++) {
+				colors2.push_back(colors[j][k]);
+			}
+		}
+
+		// Write rendering data to new file
+		char const* densitytoChar = reinterpret_cast<char const*>(densities);
+		std::string s(densitytoChar, densitytoChar + sizeof densities);
+
+		// Doesn't work because colors contains vectors not ints
+		char const* colortoChar = reinterpret_cast<char const*>(colors2);
+		std::string s(colortoChar, colortoChar + sizeof colors2);
+
+		ofstream writeFile;
+		writeFile.open("explosions_" + to_string(cur_index) +".txt");
+		cout << "" + to_string(n_per_dim) + to_string(n_per_dim) + to_string(n_per_dim) << end1;
+		cout << "0 0 0" << end1;
+		cout << "" + to_string(n_per_dim * dx) + to_string(n_per_dim * dx) + to_string(n_per_dim * dx) << end1;
+		cout << densitytoChar << end1;
+		cout << colortoChar << end1;
+		
+		writeFile.close();
 	}
 
 	virtual void drasticPressureChange(real t, real temperature) {
