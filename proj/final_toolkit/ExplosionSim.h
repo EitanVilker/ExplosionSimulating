@@ -10,8 +10,6 @@
 #include <iostream>
 #include <fstream>
 #include <sys/types.h>
-#include <dirent.h>
-using namespace std;
 
 //////////////////////////////////////////////////////////////////////////
 ////Particle fluid simulator
@@ -33,7 +31,7 @@ public:
 	Array<Vector3> colors;		// Contains colors of each grid cell in RGB
 
 	Array<Array<int>> controlPaths;
- 	Array<real> pathLengths;
+	Array<Array<real>> st_times;
 
 	////// Other Constants and Variables
 
@@ -50,7 +48,7 @@ public:
 	const real gamma = 1.4;		  //Ratio of specific heats at ambient pressure (no units)
 	const real temp_amb = 25;	 //Ambient temperature- Celcius
 	const real p_0 = 1;			  //Ambient pressure at sea level- atm
-	real explosionTemp = 1000000; //Temperature at start of explosion
+	real explosionTemp = 7000; //Temperature at start of explosion
 	real P_p = 30;				  //Peak overpressure- atm (AC- arbitarily chosen)
 	real P_m = -10;				  //Minimum negative pressure (AC)
 	real t_d = 7 / 100000;		  //Time to reach p_0 (AC)
@@ -83,8 +81,8 @@ public:
 		temps.resize(node_num, temp_amb);
 		pressures.resize(node_num, p_0);
 		div_vels.resize(node_num, 0);
-		vorticities.resize(node_num, 0);
-		colors.resize(node_num, Vector3(0));
+		vorticities.resize(node_num, VectorD::Zero());
+		colors.resize(node_num, Vector3::Zero());
 
 		//TODO: Initiating particles
 	}
@@ -174,7 +172,8 @@ public:
 				if(Bnd(i)){continue;}             ////ignore boundary nodes
 		    VectorDi node=Coord(i);
 
-				vorticities[i] = updateVorticity(dt, dx, node);
+			// Applying 3.4.6 in a more simplified manner, we scale the vorticity by the temperature in the sweepRegion
+			vorticities[i] = updateVorticity(dt, dx, node) * temps[i];
 
 		  }
 
@@ -211,7 +210,7 @@ public:
 		  }
 		}
 	}
-	inline Vector3 Cross(const VectorD& a, const VectorD& b)
+	inline Vector3 Cross(const Vector3& a,const Vector3& b) const
 	{return Vector3( (a[1] * b[2] - a[2] * b[1]), (a[0] * b[2] - a[2] * b[0]), (a[0] * b[1] - a[1] * b[0]));}
 
 
@@ -241,9 +240,12 @@ public:
 
 					int grid_cell = controlPaths[i][cur_index];
 					Array<int> sweepRegion;
-					SweepRegion(grid_cell, sweepRegion, i);
+					SweepRegion(grid_cell, &sweepRegion, &controlPaths[i]);
 					sweepRegions.push_back(sweepRegion);
-
+					//add pressure here
+					for (int node = 0; node < controlPaths[i].size(); node++)
+					{
+					}
 			}
 
 		}
@@ -259,6 +261,15 @@ public:
 		Vorticity_Confinement(dt, sweepRegions);
 		Advection(dt);
 		Projection();
+		
+		for (int j = 0; j < temps.Size(); ++j) {
+			if (temps[j] < temp_amb + 100) {
+				temps[j] = temp_amb;
+			}
+			else {
+				temps[j] -= 100;
+			}
+		}
 
 		// Update colors here to help with writing to renderer
 		for (int j = 0; j < colors.Size(); j++) {
@@ -276,7 +287,6 @@ public:
 		{
 			writeFile << densities[cell_idx] << " " << colors[cell_idx][0] << " " << colors[cell_idx][1] << " " << colors[cell_idx][2] << "\n";
 		}
-		
 		writeFile.close();
 	}
 
@@ -292,23 +302,28 @@ public:
 			(4 * M * M * gamma) + (a * a) + (2 * a) + 1;
 	}
 
-	virtual void SweepRegion(int index, Array<int> &cells, int pathNum)
+	virtual void SweepRegion(int index, Array<int> &cells, Array<int> &path)
 	{
-		Array<int> path = controlPaths[pathNum];
+		//eq_pos_time = start time for index. with the current time step it should be 0
+
+		// use dot product to scale time values.
 		VectorD pos = Pos(Coord(index));
 		for (int i = 0; i < cells.size(); i++)
-		{
+
+			real distance = 0;
 			Vector3i currentCellCoordinates = Coord(index);
-			VectorD tangentVector = findTangent(index, path);
-			if (abs((pos - currentCellCoordinates).normalized().dot(tangentVector)) <= (grid.dx * grid.dx / 4))
+			VectorD tangentVector = findTangent(pos, path);
+			if (abs((pos - currentCellCoordinates).normalize().dot(tangentVector)) <= (grid.dx * grid.dx / 4))
 			{
+				//since time should be 0 relative to start point, this should give relative time to position
+				real cell_eq_time = (((pos - currentCellCoordinates).dot(tangentVector))/grid.dx)*dt;
 
 				cells.push_back(index);
 				// Allocate uniform density value to each grid square here based on densityOpacityCurve
-				densities[index] = densityOpacityCurve(time);
+				densities[index] = densityOpacityCurve(cell_eq_time);
 
 				// Allocate user-specified uniform temperature value, based upon how much time has passed, to each grid square
-				temps[index] = getCurrentExplosionTemp();
+				temps[index] = explosionTemp;
 
 				// Allocate direction velocity to each grid square according to u_d(G(g)) = V(t_i)t(g), where g is a grid square,
 				// G(g) is the set of grid square in the region, and t(g) is the unit tangent vector derived from g on the flow control path
@@ -336,7 +351,7 @@ public:
 						temps[k] *= 100;
 					}
 				}
-		  }
+			}
 		}
 	}
 
@@ -354,13 +369,31 @@ public:
 			controlPaths.push_back(read_from_file(file_names[i]));
 		}
 
-		//find lengths
+
+		//Assign times
 		for(int i=0; i<controlPaths.size(); i++){
-			pathLengths.push_back(find_path_length(controlPaths[i], controlPaths[i].size()));
-			std::cout<<"path total length"<< (pathLengths[0]).c_str()<<std::endl;
+			real assign_time = 0.0;
+			Array<real> times_to_push;
+			for(int j=0; j<controlPaths[i].size(); j++){
+				times_to_push.push_back(assign_time);
+				assign_time += dt;
+			}
+			st_times.push_back(times_to_push);
 		}
 
-	}
+			//////TESTING
+			std::ofstream outfile("test.txt");
+			for (int i = 0; i < controlPaths.size(); i++)
+			{
+				outfile << "-------------------------" << std::endl;
+				for (int j = 0; j < controlPaths[i].size(); j++)
+				{
+					outfile << std::to_string(controlPaths[i][j]) << " - " << std::to_string(st_times[i][j]) << std::endl;
+				}
+			}
+			outfile.close();
+			//////TESTING
+		}
 
 	///////////////////////////////////// HELPER FUNCTIONS ///////////////////////////////////////
 protected:
@@ -368,20 +401,20 @@ protected:
 
 	/////////////////////////////////// Control Path Functions ///////////////////////////////////
 	//find the length of a control path
-	real find_path_length(const Array<int> &path ,int stop)
+	real find_path_length(const Array<int> &path)
 	{
 		real pathLength = 0.0;
-		for (int i = 1; i < path.size() && i<stop; i++)
+		for (int i = 1; i < path.size(); i++)
 		{
 			pathLength += distanceNd(path[i], path[i - 1]);
 		}
 		return pathLength;
 	}
 
-  /*shouldn't need this at all
+  //shouldn't need this at all
 	real getStartTimeFromIndex(const Array<int> &path, int index){
 		return st_times[findInVector<int>(path, index)];
-	}*/
+	}
 
 	// give array and index of the array you are looking at
 	// wait we need unqiue positions on the control path, so this functiom has to look for unique positions
@@ -398,12 +431,8 @@ protected:
 			j++;
 		}
   	VectorD	pos2 = Pos(Coord(path[j]));
-		VectorD result = (pos2-pos1).normalized();
+		VectorD result = (pos2-pos1).normalize();
 		return result;
-	}
-
-	void scaleByDistance(){
-
 	}
 	/////////////////////////////////// Reading Directories and Files ///////////////////////////////////
 
@@ -466,6 +495,7 @@ protected:
 
 	/////////////////////////////////// Physics Helper Functions ///////////////////////////////////
 
+	// Returns color based on blackbody radiation principles and current temperature 
 	Vector3i calculateColor(real temperature) {
 
 		Vector3i returnColor;
@@ -478,14 +508,14 @@ protected:
 		else {
 			returnColor[0] = adjustedTemp - 60;
 			returnColor[0] = 329.698727446 * pow(returnColor[0], -0.1332047592);
-
+			
 			if (returnColor[0] < 0) {
 				returnColor[0] = 0;
 			}
 			else if (returnColor[0] > 255) {
 				returnColor[0] = 255;
 			}
-
+			
 		}
 
 		// Calculate green
@@ -503,7 +533,7 @@ protected:
 		else {
 			returnColor[1] = adjustedTemp - 60;
 			returnColor[1] = 288.1221695283 * pow(returnColor[1], -0.0755148492);
-
+			
 			if (returnColor[1] < 0) {
 				returnColor[1] = 0;
 			}
@@ -569,7 +599,7 @@ protected:
 	}
 
 	// Returns velocity magnitude v_p(t)
-	// The scale adjustment is applied to v_p based on both the control path length and the propagation distance
+	// The scale adjustment is applied to v_p based on both the control path length and the propagation distance 
 	// at the pressure propagation curve
 	real pressurePropagationCurve(real t, real temperature)
 	{
@@ -597,13 +627,7 @@ protected:
 		return 331.5 + 0.6 * temperature;
 	}
 
-	// Returns uniform temperature value based on time elapsed
-	real getCurrentExplosionTemp()
-	{
-		return explosionTemp - 100000 * time;
-	}
-
-	VectorD updateVorticity(const real dt, const real dx, const VectorDi& node){
+	VectorD updateVorticity(const real dt, const real dx, VectorDi node){
 
 		VectorD ip= velocities[Idx(node+VectorDi::Unit(0))];
 		VectorD in= velocities[Idx(node-VectorDi::Unit(0))];
@@ -675,18 +699,12 @@ protected:
 	{
 		VectorD pos1 = Pos(Coord(index1));
 		VectorD pos2 = Pos(Coord(index2));
-		std::cout<<"------------"<<std::endl;
-		std::cout<< "pos 1: " << pos1 << "pos 2: "<<pos2<<std::endl;
-
 		real distance = 0.0;
 		for (int i = 0; i < d; i++)
 		{
 			distance += (pos1[i] - pos2[i]) * (pos1[i] - pos2[i]);
 		}
-		std::cout<< "distance: " << distance <<std::endl;
-		std::cout<<"------------"<<std::endl;
 		return sqrt(distance);
-
 	}
 
 	/////////////////////////////////// Grid Helper Functions ///////////////////////////////////
