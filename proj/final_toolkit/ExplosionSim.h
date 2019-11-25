@@ -11,7 +11,6 @@
 #include <fstream>
 #include <sys/types.h>
 #include <dirent.h>
-using namespace std;
 
 //////////////////////////////////////////////////////////////////////////
 ////Particle fluid simulator
@@ -247,14 +246,6 @@ public:
 			}
 
 		}
-
-			//Get which cells need to be looked at rn - Sweep Region
-			//TODO:- Density and Temperature in Sweep Region
-			//TODO: Make fuel particles
-			//TODO:- Calculate propagation velocity magnitude of density
-			//TODO:- Create vortex particles
-			//TODO:- Amplify pressure fields by detonation-y stuff
-			//TODO: Vortical effects
 
 		Vorticity_Confinement(dt, sweepRegions);
 		Advection(dt);
