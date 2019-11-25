@@ -170,7 +170,8 @@ public:
 				if(Bnd(i)){continue;}             ////ignore boundary nodes
 		    VectorDi node=Coord(i);
 
-				vorticities[i] = updateVorticity(dt, dx, node);
+			// Applying 3.4.6 in a more simplified manner, we scale the vorticity by the temperature in the sweepRegion
+			vorticities[i] = updateVorticity(dt, dx, node) * temps[i];
 
 		  }
 
@@ -289,7 +290,6 @@ public:
 				//since time should be 0 relative to start point, this should give relative time to position
 				real cell_eq_time = (((pos - currentCellCoordinates).dot(tangentVector))/grid.dx)*dt;
 
-
 				cells.push_back(index);
 				// Allocate uniform density value to each grid square here based on densityOpacityCurve
 				densities[index] = densityOpacityCurve(cell_eq_time);
@@ -305,6 +305,12 @@ public:
 				// is supposed to be a real vector
 				Vector3 unitVectorTangentToControlPath;
 				velocities[i] = densityPropagationCurve(cell_eq_time, temps[i]) * tangentVector;
+
+				if (pressurePropagationCurve(cell_eq_time) / getSpeedOfSoundInAir(temps[i]) > 1) {
+					// Pressure, temperature scaling here quite arbitrary
+					pressures[i] *= 100;
+					temperatures[i] *= 100;
+				}
 			}
 		}
 	}
