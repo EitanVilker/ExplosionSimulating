@@ -29,12 +29,8 @@ public:
 	Array<real> temps;		   //Temperature on grid cells
 	Array<real> pressures;	 //Pressure    on grid cells
 	Array<real> div_vels;	  //Divergence  on grid cells
-<<<<<<< HEAD
-	Array<Vector3> vorticities;   //Vortices    on grid cells
-=======
-	Array<real> vorticities;   //Vortices    on grid cells
+	Array<VectorD> vorticities;   //Vortices    on grid cells
 	Array<Vector3i> colors;		// Contains colors of each grid cell in RGB
->>>>>>> a9494fe9a104116b739c373057a8836a2f67fb79
 
 	Array<Array<int>> controlPaths;
  	Array<real> pathLengths;
@@ -87,12 +83,8 @@ public:
 		temps.resize(node_num, temp_amb);
 		pressures.resize(node_num, p_0);
 		div_vels.resize(node_num, 0);
-<<<<<<< HEAD
-		vorticities.resize(node_num, Vector3::Zero());
-=======
-		vorticities.resize(node_num, 0);
+		vorticities.resize(node_num, VectorD::Zero());
 		colors.resize(node_num, 0);
->>>>>>> a9494fe9a104116b739c373057a8836a2f67fb79
 
 		//TODO: Initiating particles
 	}
@@ -172,8 +164,8 @@ public:
 	void Vorticity_Confinement(const real dt, Array<Array<int>> sweep_cells)
 	{
 		real dx=grid.dx;
-              ////Vorticity confinement step 1: update vorticity
-		std::fill(vorticities.begin(),vorticities.end(),Vector3::Zero();
+    ////Vorticity confinement step 1: update vorticity
+		std::fill(vorticities.begin(),vorticities.end(),Vector3::Zero());
 		for(int m = 0; m<sweep_cells.size(); m++)
 		{
 		  for(int j=0;j<sweep_cells[m].size();j++)
@@ -296,7 +288,7 @@ public:
 		cout << "" + to_string(n_per_dim * dx) + to_string(n_per_dim * dx) + to_string(n_per_dim * dx) << end1;
 		cout << densitytoChar << end1;
 		cout << colortoChar << end1;
-		
+
 		writeFile.close();
 	}
 
@@ -337,24 +329,48 @@ public:
 				velocities[i] = densityPropagationCurve(time, temps[i]) * tangentVector;
 			}
 		}
+
+		//PRESSURE
+
+		//get the length of the path
 		real L_p = pathLengths[pathNum];	// Distance for pressure control path segment
+		//GET BIG P
+		real bigPt = pressure[index] * pressurePropagationCurve(time)*(0.1);
+
+		//for every cell in the path
 		for (int j = 0; j < index; j++)
 		{
+			//get the grid index of that cell
 			int numJ = path[j];
+			//grab the position of the cell
 			VectorD posJ = Pos(Coord(numJ));
+			//get the tangent vector at cell J
 			VectorD tangentVectorJ = findTangent(numJ, path);
+			//grab the length of the control path to point J
 			real length_to_index = find_path_length(path, j);
+			//for every cell in the grid, find the cells in the sweep region of J
 			for (int k = 0; k < cells.size(); k++)
 			{
+				// get the cell position
 				Vector3i currentCellCoordinatesK = Coord(k);
+				//check to see if its in sweep region
 			  if (abs((posJ - currentCellCoordinatesK).normalized().dot(tangentVectorJ)) <= (grid.dx * grid.dx / 4))
 				{
+					// if in sonic boom
 					if (pressurePropagationCurve(time) / getSpeedOfSoundInAir(temps[k]) > 1)
 					{
 						// Pressure, temperature scaling here quite arbitrary
 						pressures[k] *= 100;
 						temps[k] *= 100;
 					}
+					if(length_to_index<(0.5*L_p))
+					{
+						pressures[k] = bigPt * 0.4;
+					}
+					else{
+						pressures[k]  = (2*((length_to_index /L_p) - 0.5)*0.6 + 0.4) * bigPt;
+					}
+
 				}
 		  }
 		}
