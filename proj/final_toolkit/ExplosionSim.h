@@ -47,7 +47,7 @@ public:
 	const real gamma = 1.4;		  //Ratio of specific heats at ambient pressure (no units)
 	const real temp_amb = 25;	 //Ambient temperature- Celcius
 	const real p_0 = 1;			  //Ambient pressure at sea level- atm
-	real explosionTemp = 1000000; //Temperature at start of explosion
+	real explosionTemp = 7000; //Temperature at start of explosion
 	real P_p = 30;				  //Peak overpressure- atm (AC- arbitarily chosen)
 	real P_m = -10;				  //Minimum negative pressure (AC)
 	real t_d = 7 / 100000;		  //Time to reach p_0 (AC)
@@ -437,6 +437,7 @@ protected:
 
 	/////////////////////////////////// Physics Helper Functions ///////////////////////////////////
 
+	// Returns color based on blackbody radiation principles and current temperature 
 	Vector3i calculateColor(real temperature) {
 
 		Vector3i returnColor;
