@@ -27,11 +27,10 @@ public:
 	Array<real> temps;		   //Temperature on grid cells
 	Array<real> pressures;	 //Pressure    on grid cells
 	Array<real> div_vels;	  //Divergence  on grid cells
-	Array<real> vorticities;   //Vortices    on grid cells
+	Array<Vector3> vorticities;   //Vortices    on grid cells
 
 	Array<Array<int>> controlPaths;
-	Array<Array<real>> st_times;
-	Array<real> pathLengths;
+ 	Array<real> pathLengths;
 
 	////// Other Constants and Variables
 
@@ -81,7 +80,7 @@ public:
 		temps.resize(node_num, temp_amb);
 		pressures.resize(node_num, p_0);
 		div_vels.resize(node_num, 0);
-		vorticities.resize(node_num, 0);
+		vorticities.resize(node_num, Vector3::Zero());
 
 		//TODO: Initiating particles
 	}
@@ -162,7 +161,7 @@ public:
 	{
 		real dx=grid.dx;
               ////Vorticity confinement step 1: update vorticity
-		std::fill(vorticities.begin(),vorticities.end(),(real)0);
+		std::fill(vorticities.begin(),vorticities.end(),Vector3::Zero();
 		for(int m = 0; m<sweep_cells.size(); m++)
 		{
 		  for(int j=0;j<sweep_cells[m].size();j++)
@@ -208,7 +207,7 @@ public:
 		  }
 		}
 	}
-	inline Vector3 Cross(const Vector3& a,const Vector3& b)
+	inline Vector3 Cross(const VectorD& a, const VectorD& b)
 	{return Vector3( (a[1] * b[2] - a[2] * b[1]), (a[0] * b[2] - a[2] * b[0]), (a[0] * b[1] - a[1] * b[0]));}
 
 
@@ -238,12 +237,9 @@ public:
 
 					int grid_cell = controlPaths[i][cur_index];
 					Array<int> sweepRegion;
-					SweepRegion(grid_cell, &sweepRegion, &controlPaths[i]);
+					SweepRegion(grid_cell, sweepRegion, i);
 					sweepRegions.push_back(sweepRegion);
-					//add pressure here
-					for (int node = 0; node < controlPaths[i].size(); node++)
-					{
-					}
+
 			}
 
 		}
@@ -273,26 +269,20 @@ public:
 			(4 * M * M * gamma) + (a * a) + (2 * a) + 1;
 	}
 
-	virtual void SweepRegion(int index, Array<int> &cells, Array<int> &path)
+	virtual void SweepRegion(int index, Array<int> &cells, int pathNum)
 	{
-		//eq_pos_time = start time for index. with the current time step it should be 0
-
-		// use dot product to scale time values.
+		Array<int> path = controlPaths[pathNum];
 		VectorD pos = Pos(Coord(index));
 		for (int i = 0; i < cells.size(); i++)
-
-			real distance = 0;
+		{
 			Vector3i currentCellCoordinates = Coord(index);
-			VectorD tangentVector = findTangent(pos, path);
-			if (abs((pos - currentCellCoordinates).normalize().dot(tangentVector)) <= (grid.dx * grid.dx / 4))
+			VectorD tangentVector = findTangent(index, path);
+			if (abs((pos - currentCellCoordinates).normalized().dot(tangentVector)) <= (grid.dx * grid.dx / 4))
 			{
-				//since time should be 0 relative to start point, this should give relative time to position
-				real cell_eq_time = (((pos - currentCellCoordinates).dot(tangentVector))/grid.dx)*dt;
-
 
 				cells.push_back(index);
 				// Allocate uniform density value to each grid square here based on densityOpacityCurve
-				densities[index] = densityOpacityCurve(cell_eq_time);
+				densities[index] = densityOpacityCurve(time);
 
 				// Allocate user-specified uniform temperature value, based upon how much time has passed, to each grid square
 				temps[index] = getCurrentExplosionTemp();
@@ -301,24 +291,29 @@ public:
 				// G(g) is the set of grid square in the region, and t(g) is the unit tangent vector derived from g on the flow control path
 				// V(t_i) is the same for each grid square in the region
 
-				velocities[i] = densityPropagationCurve(cell_eq_time, temps[i]) * tangentVector;
-<<<<<<< HEAD
-=======
-				
-				real L_p = 0;	// Distance for pressure control path segment
-				for (int j = 0; j < index; j++) {
-
-					//TODO: Get index of location j along the control path
-					L_p += pressurePropagationCurve(cell_eq_time, temps[j]) * dt;
-				}
-
-				if (pressurePropagationCurve(cell_eq_time) / getSpeedOfSoundInAir(temps[i]) > 1) {
-					// Pressure, temperature scaling here quite arbitrary
-					pressures[i] *= 100;
-					temps[i] *= 100;
-				}
->>>>>>> 3d4cac95ac0c6e07f6c854f04ea02a400fdaf07a
+				velocities[i] = densityPropagationCurve(time, temps[i]) * tangentVector;
 			}
+		}
+		real L_p = pathLengths[pathNum];	// Distance for pressure control path segment
+		for (int j = 0; j < index; j++)
+		{
+			int numJ = path[j];
+			VectorD posJ = Pos(Coord(numJ));
+			VectorD tangentVectorJ = findTangent(numJ, path);
+			real length_to_index = find_path_length(path, j);
+			for (int k = 0; k < cells.size(); k++)
+			{
+				Vector3i currentCellCoordinatesK = Coord(k);
+			  if (abs((posJ - currentCellCoordinatesK).normalized().dot(tangentVectorJ)) <= (grid.dx * grid.dx / 4))
+				{
+					if (pressurePropagationCurve(time) / getSpeedOfSoundInAir(temps[k]) > 1)
+					{
+						// Pressure, temperature scaling here quite arbitrary
+						pressures[k] *= 100;
+						temps[k] *= 100;
+					}
+				}
+		  }
 		}
 	}
 
@@ -338,35 +333,11 @@ public:
 
 		//find lengths
 		for(int i=0; i<controlPaths.size(); i++){
-			pathLengths.push_back(find_path_length(controlPaths[i]), controlPaths[i].size());
-			std::cout<<"path total length"<< pathLengths<<std::endl;
-		]
-
-
-		//Assign times
-		for(int i=0; i<controlPaths.size(); i++){
-			real assign_time = 0.0;
-			Array<real> times_to_push;
-			for(int j=0; j<controlPaths[i].size(); j++){
-				times_to_push.push_back(assign_time);
-				assign_time += dt;
-			}
-			st_times.push_back(times_to_push);
+			pathLengths.push_back(find_path_length(controlPaths[i], controlPaths[i].size()));
+			std::cout<<"path total length"<< (pathLengths[0]).c_str()<<std::endl;
 		}
 
-			//////TESTING
-			std::ofstream outfile("test.txt");
-			for (int i = 0; i < controlPaths.size(); i++)
-			{
-				outfile << "-------------------------" << std::endl;
-				for (int j = 0; j < controlPaths[i].size(); j++)
-				{
-					outfile << std::to_string(controlPaths[i][j]) << " - " << std::to_string(st_times[i][j]) << std::endl;
-				}
-			}
-			outfile.close();
-			//////TESTING
-		}
+	}
 
 	///////////////////////////////////// HELPER FUNCTIONS ///////////////////////////////////////
 protected:
@@ -384,10 +355,10 @@ protected:
 		return pathLength;
 	}
 
-  //shouldn't need this at all
+  /*shouldn't need this at all
 	real getStartTimeFromIndex(const Array<int> &path, int index){
 		return st_times[findInVector<int>(path, index)];
-	}
+	}*/
 
 	// give array and index of the array you are looking at
 	// wait we need unqiue positions on the control path, so this functiom has to look for unique positions
@@ -404,12 +375,12 @@ protected:
 			j++;
 		}
   	VectorD	pos2 = Pos(Coord(path[j]));
-		VectorD result = (pos2-pos1).normalize();
+		VectorD result = (pos2-pos1).normalized();
 		return result;
 	}
 
 	void scaleByDistance(){
-		
+
 	}
 	/////////////////////////////////// Reading Directories and Files ///////////////////////////////////
 
@@ -575,7 +546,7 @@ protected:
 	}
 
 	// Returns velocity magnitude v_p(t)
-	// The scale adjustment is applied to v_p based on both the control path length and the propagation distance 
+	// The scale adjustment is applied to v_p based on both the control path length and the propagation distance
 	// at the pressure propagation curve
 	real pressurePropagationCurve(real t, real temperature)
 	{
@@ -609,7 +580,7 @@ protected:
 		return explosionTemp - 100000 * time;
 	}
 
-	VectorD updateVorticity(const real dt, const real dx, VectorDi node){
+	VectorD updateVorticity(const real dt, const real dx, const VectorDi& node){
 
 		VectorD ip= velocities[Idx(node+VectorDi::Unit(0))];
 		VectorD in= velocities[Idx(node-VectorDi::Unit(0))];
