@@ -29,7 +29,7 @@ public:
 	Array<real> temps;		   //Temperature on grid cells
 	Array<real> pressures;	 //Pressure    on grid cells
 	Array<real> div_vels;	  //Divergence  on grid cells
-	Array<real> vorticities;   //Vortices    on grid cells
+	Array<Vector3> vorticities;   //Vortices    on grid cells
 	Array<Vector3i> colors;		// Contains colors of each grid cell in RGB
 
 	Array<Array<int>> controlPaths;
@@ -83,7 +83,7 @@ public:
 		temps.resize(node_num, temp_amb);
 		pressures.resize(node_num, p_0);
 		div_vels.resize(node_num, 0);
-		vorticities.resize(node_num, 0);
+		vorticities.resize(node_num, VectorD::Zero());
 		colors.resize(node_num, 0);
 
 		//TODO: Initiating particles
@@ -165,7 +165,7 @@ public:
 	{
 		real dx=grid.dx;
               ////Vorticity confinement step 1: update vorticity
-		std::fill(vorticities.begin(),vorticities.end(),(real)0);
+		std::fill(vorticities.begin(),vorticities.end(),Vector3::Zero();
 		for(int m = 0; m<sweep_cells.size(); m++)
 		{
 		  for(int j=0;j<sweep_cells[m].size();j++)
@@ -301,7 +301,7 @@ public:
 		cout << "" + to_string(n_per_dim * dx) + to_string(n_per_dim * dx) + to_string(n_per_dim * dx) << end1;
 		cout << densitytoChar << end1;
 		cout << colortoChar << end1;
-		
+
 		writeFile.close();
 	}
 
@@ -344,19 +344,27 @@ public:
 				// G(g) is the set of grid square in the region, and t(g) is the unit tangent vector derived from g on the flow control path
 				// V(t_i) is the same for each grid square in the region
 
-				velocities[i] = densityPropagationCurve(cell_eq_time, temps[i]) * tangentVector;
-				
-				real L_p = 0;	// Distance for pressure control path segment
-				for (int j = 0; j < index; j++) {
-
-					//TODO: Get index of location j along the control path
-					L_p += pressurePropagationCurve(cell_eq_time, temps[j]) * dt;
-				}
-
-				if (pressurePropagationCurve(cell_eq_time) / getSpeedOfSoundInAir(temps[i]) > 1) {
-					// Pressure, temperature scaling here quite arbitrary
-					pressures[i] *= 100;
-					temps[i] *= 100;
+				velocities[i] = densityPropagationCurve(time, temps[i]) * tangentVector;
+			}
+		}
+		real L_p = pathLengths[pathNum];	// Distance for pressure control path segment
+		for (int j = 0; j < index; j++)
+		{
+			int numJ = path[j];
+			VectorD posJ = Pos(Coord(numJ));
+			VectorD tangentVectorJ = findTangent(numJ, path);
+			real length_to_index = find_path_length(path, j);
+			for (int k = 0; k < cells.size(); k++)
+			{
+				Vector3i currentCellCoordinatesK = Coord(k);
+			  if (abs((posJ - currentCellCoordinatesK).normalized().dot(tangentVectorJ)) <= (grid.dx * grid.dx / 4))
+				{
+					if (pressurePropagationCurve(time) / getSpeedOfSoundInAir(temps[k]) > 1)
+					{
+						// Pressure, temperature scaling here quite arbitrary
+						pressures[k] *= 100;
+						temps[k] *= 100;
+					}
 				}
 			}
 		}
