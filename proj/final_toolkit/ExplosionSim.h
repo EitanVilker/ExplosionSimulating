@@ -47,7 +47,7 @@ public:
 	const real gamma = 1.4;		  //Ratio of specific heats at ambient pressure (no units)
 	const real temp_amb = 25;	 //Ambient temperature- Celcius
 	const real p_0 = 1;			  //Ambient pressure at sea level- atm
-	real explosionTemp = 7000; //Temperature at start of explosion
+	real explosionTemp = 1000000; //Temperature at start of explosion
 	real P_p = 30;				  //Peak overpressure- atm (AC- arbitarily chosen)
 	real P_m = -10;				  //Minimum negative pressure (AC)
 	real t_d = 7 / 100000;		  //Time to reach p_0 (AC)
@@ -170,8 +170,7 @@ public:
 				if(Bnd(i)){continue;}             ////ignore boundary nodes
 		    VectorDi node=Coord(i);
 
-			// Applying 3.4.6 in a more simplified manner, we scale the vorticity by the temperature in the sweepRegion
-			vorticities[i] = updateVorticity(dt, dx, node) * temps[i];
+				vorticities[i] = updateVorticity(dt, dx, node);
 
 		  }
 
@@ -208,7 +207,7 @@ public:
 		  }
 		}
 	}
-	inline Vector3 Cross(const Vector3& a,const Vector3& b) const
+	inline Vector3 Cross(const Vector3& a,const Vector3& b)
 	{return Vector3( (a[1] * b[2] - a[2] * b[1]), (a[0] * b[2] - a[2] * b[0]), (a[0] * b[1] - a[1] * b[0]));}
 
 
@@ -290,6 +289,7 @@ public:
 				//since time should be 0 relative to start point, this should give relative time to position
 				real cell_eq_time = (((pos - currentCellCoordinates).dot(tangentVector))/grid.dx)*dt;
 
+
 				cells.push_back(index);
 				// Allocate uniform density value to each grid square here based on densityOpacityCurve
 				densities[index] = densityOpacityCurve(cell_eq_time);
@@ -305,12 +305,6 @@ public:
 				// is supposed to be a real vector
 				Vector3 unitVectorTangentToControlPath;
 				velocities[i] = densityPropagationCurve(cell_eq_time, temps[i]) * tangentVector;
-
-				if (pressurePropagationCurve(cell_eq_time) / getSpeedOfSoundInAir(temps[i]) > 1) {
-					// Pressure, temperature scaling here quite arbitrary
-					pressures[i] *= 100;
-					temperatures[i] *= 100;
-				}
 			}
 		}
 	}
@@ -455,7 +449,6 @@ protected:
 
 	/////////////////////////////////// Physics Helper Functions ///////////////////////////////////
 
-	// Returns color based on blackbody radiation principles and current temperature 
 	Vector3i calculateColor(real temperature) {
 
 		Vector3i returnColor;
@@ -468,14 +461,14 @@ protected:
 		else {
 			returnColor[0] = adjustedTemp - 60;
 			returnColor[0] = 329.698727446 * pow(returnColor[0], -0.1332047592);
-			
+
 			if (returnColor[0] < 0) {
 				returnColor[0] = 0;
 			}
 			else if (returnColor[0] > 255) {
 				returnColor[0] = 255;
 			}
-			
+
 		}
 
 		// Calculate green
@@ -493,7 +486,7 @@ protected:
 		else {
 			returnColor[1] = adjustedTemp - 60;
 			returnColor[1] = 288.1221695283 * pow(returnColor[1], -0.0755148492);
-			
+
 			if (returnColor[1] < 0) {
 				returnColor[1] = 0;
 			}
