@@ -31,6 +31,7 @@ public:
 
 	Array<Array<int>> controlPaths;
 	Array<Array<real>> st_times;
+	Array<real> pathLengths;
 
 	////// Other Constants and Variables
 
@@ -323,6 +324,12 @@ public:
 			controlPaths.push_back(read_from_file(file_names[i]));
 		}
 
+		//find lengths
+		for(int i=0; i<controlPaths.size(); i++){
+			pathLengths.push_back(find_path_length(controlPaths[i]), controlPaths[i].size());
+			std::cout<<"path total length"<< pathLengths<<std::endl;
+		]
+
 
 		//Assign times
 		for(int i=0; i<controlPaths.size(); i++){
@@ -355,10 +362,10 @@ protected:
 
 	/////////////////////////////////// Control Path Functions ///////////////////////////////////
 	//find the length of a control path
-	real find_path_length(const Array<int> &path)
+	real find_path_length(const Array<int> &path ,int stop)
 	{
 		real pathLength = 0.0;
-		for (int i = 1; i < path.size(); i++)
+		for (int i = 1; i < path.size() && i<stop; i++)
 		{
 			pathLength += distanceNd(path[i], path[i - 1]);
 		}
@@ -387,6 +394,10 @@ protected:
   	VectorD	pos2 = Pos(Coord(path[j]));
 		VectorD result = (pos2-pos1).normalize();
 		return result;
+	}
+
+	void scaleByDistance(){
+		
 	}
 	/////////////////////////////////// Reading Directories and Files ///////////////////////////////////
 
@@ -657,12 +668,18 @@ protected:
 	{
 		VectorD pos1 = Pos(Coord(index1));
 		VectorD pos2 = Pos(Coord(index2));
+		std::cout<<"------------"<<std::endl;
+		std::cout<< "pos 1: " << pos1 << "pos 2: "<<pos2<<std::endl;
+
 		real distance = 0.0;
 		for (int i = 0; i < d; i++)
 		{
 			distance += (pos1[i] - pos2[i]) * (pos1[i] - pos2[i]);
 		}
+		std::cout<< "distance: " << distance <<std::endl;
+		std::cout<<"------------"<<std::endl;
 		return sqrt(distance);
+
 	}
 
 	/////////////////////////////////// Grid Helper Functions ///////////////////////////////////
