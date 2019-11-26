@@ -2,7 +2,6 @@
 
 #include "Common.h"
 #include "Grid.h"
-#include "Particles.h"
 
 #include <stdlib.h>
 #include <algorithm>
@@ -38,8 +37,8 @@ public:
 
 	// Grid and Control Paths
 	int node_num;
-	int n_per_dim = 32;
-	real w = 3; //Width of sweeping region- m (AC)
+	int n_per_dim = 100;
+	real w = 10; //Width of sweeping region- m (AC)
 	int cur_index = 0;
 
 	// Physics
@@ -52,7 +51,7 @@ public:
 	real explosionTemp = 7000; //Temperature at start of explosion
 	real P_p = 30;				  //Peak overpressure- atm (AC- arbitarily chosen)
 	real P_m = -10;				  //Minimum negative pressure (AC)
-	real t_d = 7 / 100000;		  //Time to reach p_0 (AC)
+	real t_d = 9 / 100;		  //Time to reach p_0 (AC)
 	real t_n = 3 * t_d;			  //Time to reach p_0 from t_d (AC)
 	real b = 4;					  //Decreasing coefficient (AC)
 	real density_0 = 1.1839;	  //Ambient density at STP (AC)
@@ -60,12 +59,12 @@ public:
 	real q = 500.0;
 
 	//time
-	real time;		   //Current time passed (seconds)
+	real time = 0.0;		   //Current time passed (seconds)
 	real dt = 0.01;	//Timestep (seconds)
 	const int dim = 3; //Number of dimensions
 
 	// Simulation
-	bool explosion_done; //Determines whether or not we are only doing process 5
+	bool explosion_done = false; //Determines whether or not we are only doing process 5
 
 	virtual void Initialize()
 	{
@@ -99,6 +98,7 @@ public:
 			velocities[i] = VectorD::Zero();
 
 			VectorD position = Pos(Coord(i)) - (velocities[i] * dt / 2);
+			if (Bnd(i)) continue;
 			velocities[i] = Interpolate(u_copy, position);
 			VectorD position_1 = Pos(Coord(i)) - velocities[i] * dt;
 			velocities[i] = Interpolate(u_copy, position_1);
@@ -171,6 +171,7 @@ public:
 		for(int m = 0; m<sweep_cells.size(); m++)
 		{
 			for(int j=0;j<sweep_cells[m].size();j++)
+			//for(int i=0;i<node_num;i++)
 			{
 				int i = sweep_cells[m][j];
 				if(Bnd(i)){continue;}             ////ignore boundary nodes
@@ -184,6 +185,7 @@ public:
 			////Vorticity confinement step 2: update N = (grad(|vor|)) / |grad(|vor|)|
 			Array<VectorD> N(node_num,VectorD::Zero());
 			for (int k = 0; k < sweep_cells[m].size(); k++)
+			//for (int i = 0; i < node_num; i++)
 			{
 				int i = sweep_cells[m][k];
 				if (Bnd(i)) { continue; }             ////ignore boundary nodes
@@ -200,17 +202,18 @@ public:
 				//Normalize
 				N[i].normalize();
 			}
-		}
 
-		  ////Vorticity confinement step 3: calculate confinement force and use it to update velocity
-		  real vor_conf_coef=(real)4;
-		  for(int j=0;j<sweep_cells[m].size();j++)
-	 	  {
-	 		  int i = sweep_cells[m][j];
-		  	  if(Bnd(i)){continue;}             ////ignore boundary nodes
-			  VectorD f = vor_conf_coef * dx * N[i].cross(vorticities[i]);
-			  velocities[i]+=f*dt;     ////we don't have mass by assuming density=1
-		  }
+			////Vorticity confinement step 3: calculate confinement force and use it to update velocity
+			real vor_conf_coef = (real)4;
+			for (int j = 0; j < sweep_cells[m].size(); j++)
+			//for (int i = 0; i < node_num; i++)
+			{
+				int i = sweep_cells[m][j];
+				if (Bnd(i)) { continue; }             ////ignore boundary nodes
+				VectorD f = vor_conf_coef * dx * N[i].cross(vorticities[i]);
+				velocities[i] += f * dt;     ////we don't have mass by assuming density=1
+			}
+		}
 	}
 
 	virtual void Advance(const real dt)
@@ -218,7 +221,13 @@ public:
 		time += dt;
 		cur_index += 1;
 
+		if (cur_index > 200) { explosion_done = true; }
+
 		Array<Array<int>> sweepRegions;
+
+		Advection(dt);
+		Projection();
+		Vorticity_Confinement(dt, sweepRegions);
 
 		if (!explosion_done)
 		{
@@ -232,9 +241,7 @@ public:
 			}
 		}
 
-		Advection(dt);
-		Projection();
-		Vorticity_Confinement(dt, sweepRegions);
+		
 		
 		// Reduce temperatures everywhere down to minimum of ambient by arbitrary value
 		for (int j = 0; j < temps.size(); ++j) {
@@ -254,13 +261,13 @@ public:
 		// Write rendering data to new file
 
 		std::ofstream writeFile;
-		writeFile.open("explosions_" + std::to_string(cur_index) +".txt");	//TODO put in the correct folder
+		writeFile.open("C:\\Users\\f002sxf\\Downloads\\ExplosionSimulating\\ToRender\\explosions_" + std::to_string(cur_index) +".txt");	//TODO put in the correct folder
 		writeFile << n_per_dim << " " << n_per_dim << " " << n_per_dim << "\n";
 		writeFile << "0 0 0" << "\n";
 		writeFile << n_per_dim * grid.dx << " " << n_per_dim * grid.dx << " " << n_per_dim * grid.dx << "\n";
 		for (int cell_idx = 0; cell_idx < node_num; ++cell_idx)
 		{
-			writeFile << densities[cell_idx] << " " << colors[cell_idx][0] << " " << colors[cell_idx][1] << " " << colors[cell_idx][2] << "\n";
+			writeFile << (densities[cell_idx] - density_0) / 3.0f << " " << colors[cell_idx][0] << " " << colors[cell_idx][1] << " " << colors[cell_idx][2] << "\n";
 		}
 		writeFile.close();
 	}
@@ -272,8 +279,8 @@ public:
 
 		Vector3i coord = Coord(index);
 		VectorD pos = Pos(coord);
-		real bound = grid.dx * grid.dx / 4.0f;
-		for (int i = -3; i < 3; i++) for (int j = -3; j < 3; j++) for (int k = -3; k < 3; k++)
+		real bound = 0.02f;
+		for (int i = -w; i < w; i++) for (int j = -w; j < w; j++) for (int k = -w; k < w; k++)
 		{
 			Vector3i curr = coord + Vector3i(i, j, k);
 			if (!grid.Valid_Node(curr)) continue;
@@ -285,7 +292,7 @@ public:
 			cells.push_back(id);
 			densities[id] = densityOpacityCurve(time);
 			temps[id] = explosionTemp;
-			velocities[id] = densityPropagationCurve(time, temps[i]) * tangentVector;
+			velocities[id] = densityPropagationCurve(time, temps[id]) * tangentVector;
 		}
 
 		real L_p = pathLengths[pathNum];	// Distance for pressure control path segment
@@ -303,7 +310,7 @@ public:
 			VectorD tangentVectorPrev = findTangent(prevnode, pathNum);
 			real lengthToPrevIndex = find_path_length(controlPaths[pathNum], prevnode);
 			
-			for (int i = -3; i < 3; i++) for (int j = -3; j < 3; j++) for (int k = -3; k < 3; k++)
+			for (int i = -w; i < w; i++) for (int j = -w; j < w; j++) for (int k = -w; k < w; k++)
 			{
 
 				Vector3i curr = prevIndexCoord + Vector3i(i, j, k);
@@ -326,13 +333,8 @@ public:
 		}
 	}
 
-	virtual void PreProcessing()
-	{ //string dir_name){
-		// 	Intialize Variables
-		Array<std::string> file_names;
-
-		// open through directory, find array of text files
-		read_directory("/Users/student/explosions/NURBS/", file_names);
+	virtual void PreProcessing(Array<std::string> &file_names)
+	{
 		//for every textfile, call read_from_file, add to array
 		for (int i = 0; i < file_names.size(); i++)
 		{
@@ -371,22 +373,6 @@ protected:
 		return (pts[path][index + 1] - pts[path][index - 1]).normalized();
 	}
 	/////////////////////////////////// Reading Directories and Files ///////////////////////////////////
-
-	void read_directory(const std::string &name, Array<std::string> &v)
-	{
-		DIR *dirp = opendir(name.c_str());
-		struct dirent *dp;
-		while ((dp = readdir(dirp)) != NULL)
-		{
-			size_t len = strlen(dp->d_name);
-			if (len > 4 && strcmp(dp->d_name + len - 4, ".txt") == 0)
-			{
-				v.push_back(name + dp->d_name);
-			}
-		}
-		closedir(dirp);
-	}
-
 	//read points from file and create control paths
 	void read_from_file(std::string file_path)
 	{ //what params?
@@ -422,6 +408,8 @@ protected:
 
 		Vector3 returnColor;
 		real adjustedTemp = temperature / 100;
+
+		if (adjustedTemp <= 2) { return Vector3::Zero(); }
 
 		// Calculate red
 		if (adjustedTemp <= 66) {
@@ -572,10 +560,10 @@ protected:
 		////clamp pos
 		for (int i = 0; i < d; i++)
 		{
-			if (pos[i] < grid.domain_min[i])
+			if (pos[i] <= grid.domain_min[i])
 				pos[i] = grid.domain_min[i];
-			else if (pos[i] > grid.domain_max[i])
-				pos[i] = grid.domain_max[i];
+			else if (pos[i] >= grid.domain_max[i])
+				pos[i] = grid.domain_max[i] - std::numeric_limits<float>::epsilon();
 		}
 
 		VectorDi cell = ((pos - grid.domain_min) * one_over_dx).template cast<int>();
@@ -601,13 +589,14 @@ protected:
 					 u[Idx(Vector3i(cell[0] + 1, cell[1] + 1, cell[2]))],
 					 frac[0]),
 				frac[1]),
-			lerp(u[Idx(Vector3i(cell[0], cell[1], cell[2] + 1))],
-				 u[Idx(Vector3i(cell[0] + 1, cell[1], cell[2] + 1))],
-				 frac[0]),
-			lerp(u[Idx(Vector3i(cell[0], cell[1] + 1, cell[2] + 1))],
-				 u[Idx(Vector3i(cell[0] + 1, cell[1] + 1, cell[2] + 1))],
-				 frac[0]),
-			frac[1],
+			lerp(
+				lerp(u[Idx(Vector3i(cell[0], cell[1], cell[2] + 1))],
+					 u[Idx(Vector3i(cell[0] + 1, cell[1], cell[2] + 1))],
+					 frac[0]),
+				lerp(u[Idx(Vector3i(cell[0], cell[1] + 1, cell[2] + 1))],
+					 u[Idx(Vector3i(cell[0] + 1, cell[1] + 1, cell[2] + 1))],
+					 frac[0]),
+				frac[1]),
 			frac[2]);
 	}
 
